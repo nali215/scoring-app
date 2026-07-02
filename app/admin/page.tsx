@@ -1,5 +1,6 @@
 import { CalendarDays, FileSpreadsheet, LockKeyhole, Settings2, ShieldCheck, Upload, Users } from 'lucide-react'
 import { AppHeader } from '@/components/app-header'
+import { CourtAccessManager } from '@/components/court-access-manager'
 import { StatusPill } from '@/components/status-pill'
 import { WorkflowStep } from '@/components/workflow-step'
 import { adminScheduleActions, divisionOptions, importColumnOptions, setupSteps, sportDefaults } from '@/lib/app-data'
@@ -147,6 +148,10 @@ export default function AdminPage() {
           </section>
         </div>
 
+        <div className="mt-6">
+          <CourtAccessManager />
+        </div>
+
         <div className="mt-6 border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
             <div>
@@ -174,4 +179,3 @@ export default function AdminPage() {
     </main>
   )
 }
-

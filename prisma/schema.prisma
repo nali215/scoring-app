@@ -253,8 +253,26 @@ model Court {
   tournament     Tournament      @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   matches        Match[]
   displayDevices DisplayDevice[]
+  scorekeeperAccessLinks ScorekeeperAccessLink[]
 
   @@unique([tournamentId, number])
+}
+
+model ScorekeeperAccessLink {
+  id           String   @id @default(cuid())
+  tournamentId String
+  courtId      String
+  label        String
+  tokenHash    String   @unique
+  active       Boolean  @default(true)
+  lastUsedAt   DateTime?
+  expiresAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  court Court @relation(fields: [courtId], references: [id], onDelete: Cascade)
+
+  @@index([tournamentId, courtId, active])
 }
 
 model Match {
@@ -497,4 +515,3 @@ model AuditLog {
   @@index([tournamentId, createdAt])
   @@index([entityType, entityId])
 }
-
