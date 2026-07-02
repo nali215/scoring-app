@@ -1,13 +1,23 @@
 'use client'
 
 import { StatusPill } from '@/components/status-pill'
-import { useLiveDemo } from '@/lib/use-live-demo'
-import type { LiveDemoState } from '@/lib/live-demo'
+import { useLiveScores } from '@/lib/use-live-scores'
+import type { LiveState } from '@/lib/live-state'
 
-export function LiveScorekeeper({ initialState }: { initialState: LiveDemoState }) {
-  const { state, error, sendAction } = useLiveDemo(initialState)
+export function LiveScorekeeper({ initialState }: { initialState: LiveState }) {
+  const { state, error, sendAction } = useLiveScores(initialState)
   const liveState = state ?? initialState
   const match = liveState.matches.find((candidate) => !candidate.submitted) ?? liveState.matches[0]
+
+  if (!match) {
+    return (
+      <div className="border border-slate-200 bg-white p-8 text-center text-ink shadow-sm">
+        <p className="text-2xl font-black">No match assigned</p>
+        <p className="mt-2 text-sm text-slate-500">Assigned live matches will appear here when the admin publishes the schedule.</p>
+      </div>
+    )
+  }
+
   const submitted = match.submitted
 
   return (
@@ -63,7 +73,7 @@ export function LiveScorekeeper({ initialState }: { initialState: LiveDemoState 
           onClick={() => sendAction({ action: 'reset' })}
           className="rounded-2xl border border-slate-300 px-4 py-4 font-bold text-slate-700"
         >
-          Reset demo
+          Reset
         </button>
         <button
           disabled={submitted}

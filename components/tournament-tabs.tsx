@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import { StatusPill } from '@/components/status-pill'
-import { useLiveDemo } from '@/lib/use-live-demo'
-import type { LiveDemoState } from '@/lib/live-demo'
+import { useLiveScores } from '@/lib/use-live-scores'
+import type { LiveState } from '@/lib/live-state'
 
 type Match = {
   court: string
@@ -50,10 +50,10 @@ function statusTone(status: string): 'neutral' | 'success' | 'warning' | 'danger
 export function TournamentTabs({
   initialState
 }: {
-  initialState: LiveDemoState
+  initialState: LiveState
 }) {
   const [activeTab, setActiveTab] = useState<Tab>('Games')
-  const { state, error } = useLiveDemo(initialState)
+  const { state, error } = useLiveScores(initialState)
   const liveState = state ?? initialState
   const matches = liveState.matches satisfies Match[]
   const standings = liveState.standings satisfies Standing[]
@@ -84,6 +84,12 @@ export function TournamentTabs({
 
       {activeTab === 'Games' && (
         <div className="divide-y divide-slate-200">
+          {matches.length === 0 && (
+            <div className="p-8 text-center">
+              <p className="text-lg font-black text-ink">No games scheduled</p>
+              <p className="mt-2 text-sm text-slate-500">Games will appear here after the admin publishes a schedule.</p>
+            </div>
+          )}
           {matches.map((match) => (
             <article key={`${match.court}-${match.teamA}`} className="p-4 hover:bg-slate-50">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -105,7 +111,13 @@ export function TournamentTabs({
 
       {activeTab === 'Standings' && (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-left text-sm">
+          {standings.length === 0 && (
+            <div className="p-8 text-center">
+              <p className="text-lg font-black text-ink">No standings yet</p>
+              <p className="mt-2 text-sm text-slate-500">Standings update after completed matches are submitted.</p>
+            </div>
+          )}
+          {standings.length > 0 && <table className="w-full min-w-[720px] text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="px-4 py-3">Rank</th>
@@ -134,12 +146,18 @@ export function TournamentTabs({
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table>}
         </div>
       )}
 
       {activeTab === 'Schedule' && (
         <div className="divide-y divide-slate-200">
+          {schedule.length === 0 && (
+            <div className="p-8 text-center">
+              <p className="text-lg font-black text-ink">No schedule published</p>
+              <p className="mt-2 text-sm text-slate-500">Schedule rows will appear after the admin assigns courts and times.</p>
+            </div>
+          )}
           {schedule.map((match) => (
             <div key={`${match.time}-${match.court}`} className="grid gap-3 p-4 hover:bg-slate-50 md:grid-cols-[90px_90px_1fr_auto] md:items-center">
               <p className="font-black text-ink">{match.time}</p>
