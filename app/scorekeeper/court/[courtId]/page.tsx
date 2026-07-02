@@ -4,16 +4,19 @@ import { LiveScorekeeper } from '@/components/live-scorekeeper'
 import { StatusPill } from '@/components/status-pill'
 import { getLiveState } from '@/lib/live-state'
 
-export default function CourtScorekeeperPage({
+export default async function CourtScorekeeperPage({
   params,
   searchParams
 }: {
-  params: { courtId: string }
-  searchParams: { code?: string }
+  params: Promise<{ courtId: string }>
+  searchParams: Promise<{ code?: string | string[] }>
 }) {
+  const resolvedParams = await params
+  const resolvedSearchParams = await searchParams
   const initialState = getLiveState()
-  const hasCode = Boolean(searchParams.code)
-  const courtLabel = `Court ${params.courtId}`
+  const code = Array.isArray(resolvedSearchParams.code) ? resolvedSearchParams.code[0] : resolvedSearchParams.code
+  const hasCode = Boolean(code)
+  const courtLabel = `Court ${resolvedParams.courtId}`
 
   return (
     <main className="min-h-screen bg-slate-950 text-white">
@@ -43,4 +46,3 @@ export default function CourtScorekeeperPage({
     </main>
   )
 }
-
