@@ -1,9 +1,10 @@
-import { CalendarDays, FileSpreadsheet, LockKeyhole, Settings2, ShieldCheck, Upload, Users } from 'lucide-react'
+import { CalendarDays, Settings2, ShieldCheck, Users } from 'lucide-react'
 import { AppHeader } from '@/components/app-header'
 import { CourtAccessManager } from '@/components/court-access-manager'
+import { RosterManager } from '@/components/roster-manager'
 import { StatusPill } from '@/components/status-pill'
 import { WorkflowStep } from '@/components/workflow-step'
-import { adminScheduleActions, divisionOptions, importColumnOptions, setupSteps, sportDefaults } from '@/lib/app-data'
+import { adminScheduleActions, divisionOptions, setupSteps, sportDefaults } from '@/lib/app-data'
 
 const correctionRules = [
   'Scorekeepers can edit only assigned live matches.',
@@ -82,43 +83,8 @@ export default function AdminPage() {
           </section>
         </div>
 
-        <div className="mt-6 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-          <section className="border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex items-center gap-3">
-              <FileSpreadsheet className="text-court-600" />
-              <div>
-                <p className="text-sm font-bold uppercase tracking-[0.18em] text-court-700">Roster import</p>
-                <h2 className="text-2xl font-black text-slate-950">CSV/XLSX column mapping</h2>
-              </div>
-            </div>
-            <div className="mt-5 border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-              <Upload className="mx-auto text-slate-400" />
-              <p className="mt-3 font-black text-slate-950">Upload roster file</p>
-              <p className="mt-1 text-sm text-slate-500">After upload, detected columns can be mapped before import.</p>
-            </div>
-            <div className="mt-5 grid gap-2 md:grid-cols-3">
-              {importColumnOptions.map((column) => (
-                <div key={column} className="border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-700">
-                  {column}
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex items-center gap-3">
-              <LockKeyhole className="text-court-600" />
-              <div>
-                <p className="text-sm font-bold uppercase tracking-[0.18em] text-court-700">Admin access</p>
-                <h2 className="text-2xl font-black text-slate-950">Credential policy</h2>
-              </div>
-            </div>
-            <div className="mt-5 space-y-3 text-sm leading-6 text-slate-600">
-              <p>Admin login should use a hashed password and require changing the initial password during setup.</p>
-              <p>Scorekeepers should only receive match/court assignments, not full admin access.</p>
-              <p>Submitted scores require admin correction with a reason.</p>
-            </div>
-          </section>
+        <div className="mt-6">
+          <RosterManager />
         </div>
 
         <div className="mt-6 grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
