@@ -1,10 +1,9 @@
 import Link from 'next/link'
-import { Trophy } from 'lucide-react'
+import { LockKeyhole, Trophy } from 'lucide-react'
 import { clsx } from 'clsx'
 
 const navItems = [
-  { href: '/tournaments', label: 'Public view' },
-  { href: '/admin', label: 'Admin' },
+  { href: '/', label: 'Tournaments' },
   { href: '/scorekeeper', label: 'Scorekeeper' },
   { href: '/display', label: 'Display' }
 ]
@@ -39,6 +38,16 @@ export function AppHeader({ theme = 'light' }: { theme?: 'light' | 'dark' }) {
           </Link>
         ))}
       </nav>
+      <Link
+        href="/admin"
+        className={clsx(
+          'flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-bold shadow-sm',
+          isDark ? 'border-white/10 bg-white/10 text-white' : 'border-slate-200 bg-white text-slate-700'
+        )}
+      >
+        <LockKeyhole size={16} />
+        Admin login
+      </Link>
     </header>
   )
 }
