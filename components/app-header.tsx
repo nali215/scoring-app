@@ -3,6 +3,7 @@ import { Trophy } from 'lucide-react'
 import { clsx } from 'clsx'
 
 const navItems = [
+  { href: '/tournaments', label: 'Public view' },
   { href: '/admin', label: 'Admin' },
   { href: '/scorekeeper', label: 'Scorekeeper' },
   { href: '/display', label: 'Display' }

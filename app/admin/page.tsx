@@ -17,6 +17,13 @@ const readinessChecks = [
   ['Scorekeepers assigned', 'Keep one active scorekeeper lock per match to avoid conflicts.']
 ]
 
+const correctionRules = [
+  'Scorekeepers can edit only assigned live matches.',
+  'Final submit locks the match for scorekeepers.',
+  'Only admins can reopen or correct submitted scores.',
+  'Every admin correction requires a reason and audit entry.'
+]
+
 export default function AdminPage() {
   return (
     <main className="min-h-screen bg-slate-50">
@@ -63,6 +70,23 @@ export default function AdminPage() {
               Every destructive or tournament-changing action should explain what it changes, ask for confirmation, and
               write an audit log entry.
             </p>
+          </div>
+        </div>
+
+        <div className="mt-8 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-[0.18em] text-court-700">Score control policy</p>
+              <h2 className="mt-3 text-3xl font-black text-ink">Live phones are fast; submitted scores are protected.</h2>
+            </div>
+            <StatusPill tone="success">Admin-only corrections</StatusPill>
+          </div>
+          <div className="mt-6 grid gap-3 md:grid-cols-4">
+            {correctionRules.map((rule) => (
+              <div key={rule} className="rounded-2xl bg-slate-50 p-5 text-sm font-bold leading-6 text-slate-700 ring-1 ring-slate-200">
+                {rule}
+              </div>
+            ))}
           </div>
         </div>
       </section>
