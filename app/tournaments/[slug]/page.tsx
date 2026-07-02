@@ -1,7 +1,9 @@
 import Link from 'next/link'
+import { ArrowLeft } from 'lucide-react'
 import { AppHeader } from '@/components/app-header'
 import { StatusPill } from '@/components/status-pill'
 import { TournamentTabs } from '@/components/tournament-tabs'
+import { LinkButton } from '@/components/ui'
 import { tournaments } from '@/lib/app-data'
 import { getLiveState } from '@/lib/live-state'
 
@@ -10,42 +12,44 @@ export default function PublicTournamentPage({ params }: { params: { slug: strin
   const initialState = getLiveState()
 
   return (
-    <main className="min-h-screen bg-[#f3f5f8]">
+    <main className="min-h-screen">
       <AppHeader />
-      <section className="mx-auto max-w-7xl px-4 pb-16 pt-4 sm:px-6">
-        <div className="mb-4">
-          <Link href="/" className="text-sm font-bold text-slate-500 hover:text-slate-950">
-            ← Tournaments
-          </Link>
-        </div>
+      <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+        <Link href="/" className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-ink">
+          <ArrowLeft size={15} />
+          Tournaments
+        </Link>
 
         {!tournament ? (
-          <div className="border border-slate-200 bg-white p-10 text-center shadow-sm">
-            <p className="text-2xl font-black text-slate-950">Tournament not found</p>
-            <p className="mt-2 text-sm text-slate-500">Publish a tournament from Admin to make it available here.</p>
-            <Link href="/" className="mt-6 inline-flex bg-slate-950 px-5 py-3 text-sm font-bold text-white">
+          <div className="mt-4 rounded-xl border border-line bg-white p-12 text-center shadow-card">
+            <h1 className="text-lg font-bold text-ink">Tournament not found</h1>
+            <p className="mt-1.5 text-sm text-slate-500">Publish a tournament from Admin to make it available here.</p>
+            <LinkButton href="/" variant="primary" className="mt-6">
               Back to tournaments
-            </Link>
+            </LinkButton>
           </div>
         ) : (
           <>
-            <div className="mb-4 border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mt-4 rounded-xl border border-line bg-white p-5 shadow-card">
               <div className="flex flex-wrap items-center gap-2">
-                <StatusPill tone={tournament.status === 'Live' ? 'warning' : 'neutral'}>{tournament.status}</StatusPill>
-                <StatusPill>{tournament.sport}</StatusPill>
+                <StatusPill tone={tournament.status === 'Live' ? 'success' : 'neutral'} dot={tournament.status === 'Live'}>
+                  {tournament.status}
+                </StatusPill>
+                <StatusPill tone="brand">{tournament.sport}</StatusPill>
                 <StatusPill>{tournament.courts} courts</StatusPill>
               </div>
-              <h1 className="mt-3 text-3xl font-black text-slate-950">{tournament.name}</h1>
-              <p className="mt-1 text-sm font-semibold text-slate-500">
+              <h1 className="mt-3 text-2xl font-bold tracking-tight text-ink sm:text-3xl">{tournament.name}</h1>
+              <p className="mt-1 text-sm text-slate-500">
                 {tournament.venue} · {tournament.date} · {tournament.timeWindow}
               </p>
             </div>
 
-            <TournamentTabs initialState={initialState} />
+            <div className="mt-4">
+              <TournamentTabs initialState={initialState} />
+            </div>
           </>
         )}
       </section>
     </main>
   )
 }
-

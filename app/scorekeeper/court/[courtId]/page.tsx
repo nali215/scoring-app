@@ -21,21 +21,22 @@ export default async function CourtScorekeeperPage({
   return (
     <main className="min-h-screen bg-slate-950 text-white">
       <AppHeader theme="dark" />
-      <section className="mx-auto max-w-5xl px-4 pb-16 pt-6">
-        <div className="mb-6 border border-white/10 bg-white/5 p-5 text-white">
-          <StatusPill tone={hasCode ? 'success' : 'danger'}>{hasCode ? 'Access link' : 'Missing code'}</StatusPill>
-          <h1 className="mt-4 text-3xl font-black md:text-5xl">{courtLabel} scorekeeper</h1>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">
-            This page is scoped to one court. The current match for this court appears here after the admin publishes the
-            schedule.
+      <section className="mx-auto max-w-2xl px-4 py-6 sm:px-6">
+        <div className="mb-5 rounded-xl border border-white/10 bg-white/[0.04] p-5">
+          <StatusPill tone={hasCode ? 'success' : 'danger'} dot={hasCode}>
+            {hasCode ? 'Access link active' : 'Missing code'}
+          </StatusPill>
+          <h1 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">{courtLabel} scorekeeper</h1>
+          <p className="mt-1.5 text-sm leading-6 text-slate-400">
+            This page is scoped to one court. Its current match shows here once the schedule is published.
           </p>
         </div>
 
         {!hasCode ? (
-          <div className="border border-rose-900/50 bg-rose-950/40 p-8 text-center">
-            <p className="text-2xl font-black">Invalid scorekeeper link</p>
-            <p className="mt-2 text-sm text-rose-100">Ask the tournament admin to send you the current court link.</p>
-            <Link href="/" className="mt-6 inline-flex bg-white px-5 py-3 text-sm font-bold text-slate-950">
+          <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-8 text-center">
+            <p className="text-lg font-bold">Invalid scorekeeper link</p>
+            <p className="mt-1.5 text-sm text-rose-100/80">Ask the tournament admin to send you the current court link.</p>
+            <Link href="/" className="mt-6 inline-flex rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-slate-950">
               Back to tournaments
             </Link>
           </div>

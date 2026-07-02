@@ -1,178 +1,152 @@
 'use client'
 
 import { useState } from 'react'
+import { CalendarClock, ListOrdered, Radio } from 'lucide-react'
 import { StatusPill } from '@/components/status-pill'
+import { cn } from '@/components/ui'
 import { useLiveScores } from '@/lib/use-live-scores'
 import type { LiveState } from '@/lib/live-state'
 
-type Match = {
-  court: string
-  division: string
-  round: string
-  teamA: string
-  teamB: string
-  score: string
-  status: string
-  editableBy: string
-  time: string
-}
+const tabs = [
+  { key: 'Games', icon: Radio },
+  { key: 'Standings', icon: ListOrdered },
+  { key: 'Schedule', icon: CalendarClock }
+] as const
+type Tab = (typeof tabs)[number]['key']
 
-type Standing = {
-  rank: number
-  team: string
-  division: string
-  played: number
-  wins: number
-  losses: number
-  pointsFor: number
-  pointsAgainst: number
-  differential: number
-}
-
-type ScheduleItem = {
-  time: string
-  court: string
-  division: string
-  match: string
-  phase: string
-  status: string
-}
-
-const tabs = ['Games', 'Standings', 'Schedule'] as const
-type Tab = (typeof tabs)[number]
-
-function statusTone(status: string): 'neutral' | 'success' | 'warning' | 'danger' {
-  if (status === 'Live' || status.includes('live')) return 'warning'
-  if (status === 'Submitted' || status === 'Completed') return 'success'
+function statusTone(status: string): 'neutral' | 'success' | 'warning' {
+  const value = status.toLowerCase()
+  if (value.includes('live')) return 'warning'
+  if (value.includes('final') || value.includes('submitted') || value.includes('complete')) return 'success'
   return 'neutral'
 }
 
-export function TournamentTabs({
-  initialState
-}: {
-  initialState: LiveState
-}) {
+function EmptyRow({ title, note }: { title: string; note: string }) {
+  return (
+    <div className="p-10 text-center">
+      <p className="text-sm font-bold text-ink">{title}</p>
+      <p className="mt-1 text-sm text-slate-500">{note}</p>
+    </div>
+  )
+}
+
+export function TournamentTabs({ initialState }: { initialState: LiveState }) {
   const [activeTab, setActiveTab] = useState<Tab>('Games')
   const { state, error } = useLiveScores(initialState)
-  const liveState = state ?? initialState
-  const matches = liveState.matches satisfies Match[]
-  const standings = liveState.standings satisfies Standing[]
-  const schedule = liveState.schedule satisfies ScheduleItem[]
+  const live = state ?? initialState
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="sticky top-0 z-10 border-b border-slate-200 bg-white p-2">
+    <div className="overflow-hidden rounded-xl border border-line bg-white shadow-card">
+      <div className="flex items-center justify-between gap-3 border-b border-line px-3 py-2.5">
         <div className="flex gap-1">
-          {tabs.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`flex-1 rounded-xl px-4 py-3 text-sm font-black ${
-                activeTab === tab ? 'bg-ink text-white' : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
+          {tabs.map((tab) => {
+            const Icon = tab.icon
+            const isActive = activeTab === tab.key
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors',
+                  isActive ? 'bg-ink text-white' : 'text-slate-500 hover:bg-slate-100'
+                )}
+              >
+                <Icon size={15} />
+                {tab.key}
+              </button>
+            )
+          })}
         </div>
-        <div className="mt-2 flex items-center justify-between px-2 text-xs font-bold text-slate-500">
-          <span>Live refresh every 2s</span>
-          <span>Version {liveState.version}</span>
-        </div>
-        {error && <p className="mt-2 rounded-xl bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">{error}</p>}
+        <span className="hidden items-center gap-1.5 pr-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400 sm:inline-flex">
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand-500" />
+          Auto-refresh
+        </span>
       </div>
 
-      {activeTab === 'Games' && (
-        <div className="divide-y divide-slate-200">
-          {matches.length === 0 && (
-            <div className="p-8 text-center">
-              <p className="text-lg font-black text-ink">No games scheduled</p>
-              <p className="mt-2 text-sm text-slate-500">Games will appear here after the admin publishes a schedule.</p>
-            </div>
-          )}
-          {matches.map((match) => (
-            <article key={`${match.court}-${match.teamA}`} className="p-4 hover:bg-slate-50">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs font-black uppercase tracking-wide text-court-700">
-                  {match.time} · {match.court} · {match.division} · {match.round}
-                </p>
+      {error ? <p className="border-b border-rose-100 bg-rose-50 px-4 py-2 text-xs font-semibold text-rose-700">{error}</p> : null}
+
+      {activeTab === 'Games' &&
+        (live.matches.length === 0 ? (
+          <EmptyRow title="No games yet" note="Games appear here after the admin publishes a schedule." />
+        ) : (
+          <div className="divide-y divide-line">
+            {live.matches.map((match) => (
+              <article key={`${match.court}-${match.teamA}`} className="p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                    {match.time} · {match.court} · {match.division}
+                  </p>
+                  <StatusPill tone={statusTone(match.status)} dot={statusTone(match.status) === 'warning'}>
+                    {match.status}
+                  </StatusPill>
+                </div>
+                <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                  <p className="text-[15px] font-bold text-ink">{match.teamA}</p>
+                  <p className="tabular rounded-lg bg-slate-900 px-4 py-2 text-center text-xl font-bold text-white">{match.score}</p>
+                  <p className="text-right text-[15px] font-bold text-ink">{match.teamB}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        ))}
+
+      {activeTab === 'Standings' &&
+        (live.standings.length === 0 ? (
+          <EmptyRow title="No standings yet" note="Standings update as completed matches are submitted." />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[680px] text-left text-sm">
+              <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-2.5 font-semibold">#</th>
+                  <th className="px-4 py-2.5 font-semibold">Team</th>
+                  <th className="px-4 py-2.5 font-semibold">Division</th>
+                  <th className="px-3 py-2.5 text-center font-semibold">W</th>
+                  <th className="px-3 py-2.5 text-center font-semibold">L</th>
+                  <th className="px-3 py-2.5 text-center font-semibold">PF</th>
+                  <th className="px-3 py-2.5 text-center font-semibold">PA</th>
+                  <th className="px-3 py-2.5 text-center font-semibold">Diff</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line tabular">
+                {live.standings.map((standing) => (
+                  <tr key={standing.team} className="hover:bg-slate-50">
+                    <td className="px-4 py-3 font-bold text-ink">{standing.rank}</td>
+                    <td className="px-4 py-3 font-bold text-ink">{standing.team}</td>
+                    <td className="px-4 py-3 text-slate-500">{standing.division}</td>
+                    <td className="px-3 py-3 text-center font-semibold text-brand-700">{standing.wins}</td>
+                    <td className="px-3 py-3 text-center font-semibold text-slate-600">{standing.losses}</td>
+                    <td className="px-3 py-3 text-center text-slate-600">{standing.pointsFor}</td>
+                    <td className="px-3 py-3 text-center text-slate-600">{standing.pointsAgainst}</td>
+                    <td className="px-3 py-3 text-center font-semibold text-ink">
+                      {standing.differential > 0 ? `+${standing.differential}` : standing.differential}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
+
+      {activeTab === 'Schedule' &&
+        (live.schedule.length === 0 ? (
+          <EmptyRow title="No schedule published" note="Schedule rows appear after the admin assigns courts and times." />
+        ) : (
+          <div className="divide-y divide-line">
+            {live.schedule.map((match) => (
+              <div key={`${match.time}-${match.court}`} className="grid grid-cols-[64px_1fr_auto] items-center gap-3 p-4">
+                <p className="tabular text-sm font-bold text-ink">{match.time}</p>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-ink">{match.match}</p>
+                  <p className="truncate text-xs text-slate-500">
+                    {match.court} · {match.division} · {match.phase}
+                  </p>
+                </div>
                 <StatusPill tone={statusTone(match.status)}>{match.status}</StatusPill>
               </div>
-              <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto_1fr] md:items-center">
-                <p className="text-lg font-black text-ink">{match.teamA}</p>
-                <p className="rounded-xl bg-slate-900 px-4 py-3 text-center text-2xl font-black text-white">{match.score}</p>
-                <p className="text-lg font-black text-ink md:text-right">{match.teamB}</p>
-              </div>
-              <p className="mt-3 text-xs font-bold uppercase tracking-wide text-slate-500">Edit state: {match.editableBy}</p>
-            </article>
-          ))}
-        </div>
-      )}
-
-      {activeTab === 'Standings' && (
-        <div className="overflow-x-auto">
-          {standings.length === 0 && (
-            <div className="p-8 text-center">
-              <p className="text-lg font-black text-ink">No standings yet</p>
-              <p className="mt-2 text-sm text-slate-500">Standings update after completed matches are submitted.</p>
-            </div>
-          )}
-          {standings.length > 0 && <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-4 py-3">Rank</th>
-                <th className="px-4 py-3">Team</th>
-                <th className="px-4 py-3">Division</th>
-                <th className="px-4 py-3 text-center">P</th>
-                <th className="px-4 py-3 text-center">W</th>
-                <th className="px-4 py-3 text-center">L</th>
-                <th className="px-4 py-3 text-center">PF</th>
-                <th className="px-4 py-3 text-center">PA</th>
-                <th className="px-4 py-3 text-center">Diff</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {standings.map((standing) => (
-                <tr key={standing.team} className="hover:bg-slate-50">
-                  <td className="px-4 py-4 text-lg font-black text-ink">{standing.rank}</td>
-                  <td className="px-4 py-4 font-black text-ink">{standing.team}</td>
-                  <td className="px-4 py-4 font-semibold text-slate-600">{standing.division}</td>
-                  <td className="px-4 py-4 text-center font-bold">{standing.played}</td>
-                  <td className="px-4 py-4 text-center font-bold text-court-700">{standing.wins}</td>
-                  <td className="px-4 py-4 text-center font-bold">{standing.losses}</td>
-                  <td className="px-4 py-4 text-center font-bold">{standing.pointsFor}</td>
-                  <td className="px-4 py-4 text-center font-bold">{standing.pointsAgainst}</td>
-                  <td className="px-4 py-4 text-center font-bold">{standing.differential > 0 ? `+${standing.differential}` : standing.differential}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>}
-        </div>
-      )}
-
-      {activeTab === 'Schedule' && (
-        <div className="divide-y divide-slate-200">
-          {schedule.length === 0 && (
-            <div className="p-8 text-center">
-              <p className="text-lg font-black text-ink">No schedule published</p>
-              <p className="mt-2 text-sm text-slate-500">Schedule rows will appear after the admin assigns courts and times.</p>
-            </div>
-          )}
-          {schedule.map((match) => (
-            <div key={`${match.time}-${match.court}`} className="grid gap-3 p-4 hover:bg-slate-50 md:grid-cols-[90px_90px_1fr_auto] md:items-center">
-              <p className="font-black text-ink">{match.time}</p>
-              <p className="text-sm font-bold text-court-700">{match.court}</p>
-              <div>
-                <p className="font-black text-ink">{match.match}</p>
-                <p className="text-sm text-slate-500">
-                  {match.division} · {match.phase}
-                </p>
-              </div>
-              <StatusPill tone={statusTone(match.status)}>{match.status}</StatusPill>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        ))}
     </div>
   )
 }

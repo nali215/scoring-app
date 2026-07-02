@@ -1,8 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
-import { Check, Copy, Mail, MessageSquare, QrCode, RefreshCw, Share2 } from 'lucide-react'
+import { Check, Copy, Mail, MessageSquare, QrCode, RefreshCw, Share2, Ticket } from 'lucide-react'
+import { StatusPill } from '@/components/status-pill'
+import { Button, Card, SectionHeader } from '@/components/ui'
 import QRCode from 'qrcode'
 
 type CourtAccess = {
@@ -31,149 +33,140 @@ export function CourtAccessManager() {
   const [selectedCourt, setSelectedCourt] = useState(1)
   const [copiedCourt, setCopiedCourt] = useState<number | null>(null)
   const [qrDataUrl, setQrDataUrl] = useState('')
+  const copyTimer = useRef<number | null>(null)
 
   const origin = typeof window === 'undefined' ? '' : window.location.origin
-  const selected = courts.find((court) => court.courtNumber === selectedCourt) ?? courts[0]
-
-  const links = useMemo(() => {
-    return courts.map((court) => ({
-      ...court,
-      url: `${origin}/scorekeeper/court/${court.courtNumber}?code=${court.code}`
-    }))
-  }, [courts, origin])
-
-  const selectedLink = links.find((court) => court.courtNumber === selected?.courtNumber) ?? links[0]
+  const links = useMemo(
+    () => courts.map((court) => ({ ...court, url: `${origin}/scorekeeper/court/${court.courtNumber}?code=${court.code}` })),
+    [courts, origin]
+  )
+  const selectedLink = links.find((court) => court.courtNumber === selectedCourt) ?? links[0]
 
   useEffect(() => {
     if (!selectedLink?.url) return
-
-    QRCode.toDataURL(selectedLink.url, {
-      width: 240,
-      margin: 1,
-      errorCorrectionLevel: 'M'
-    }).then(setQrDataUrl).catch(() => setQrDataUrl(''))
+    QRCode.toDataURL(selectedLink.url, { width: 240, margin: 1, errorCorrectionLevel: 'M' })
+      .then(setQrDataUrl)
+      .catch(() => setQrDataUrl(''))
   }, [selectedLink?.url])
 
   async function copyLink(court: CourtAccess & { url: string }) {
     await navigator.clipboard.writeText(court.url)
     setCopiedCourt(court.courtNumber)
-    window.setTimeout(() => setCopiedCourt(null), 1500)
+    if (copyTimer.current) window.clearTimeout(copyTimer.current)
+    copyTimer.current = window.setTimeout(() => setCopiedCourt(null), 1500)
   }
 
   function regenerate(courtNumber: number) {
-    setCourts((current) =>
-      current.map((court) => (court.courtNumber === courtNumber ? { ...court, code: createCode() } : court))
-    )
+    setCourts((current) => current.map((court) => (court.courtNumber === courtNumber ? { ...court, code: createCode() } : court)))
   }
 
   async function shareLink(court: CourtAccess & { url: string }) {
     if (navigator.share) {
-      await navigator.share({
-        title: `${court.label} scorekeeper link`,
-        text: `Open this link to score ${court.label}.`,
-        url: court.url
-      })
+      await navigator.share({ title: `${court.label} scorekeeper link`, text: `Score ${court.label}`, url: court.url })
       return
     }
-
     await copyLink(court)
   }
 
+  const linkAction = 'inline-flex items-center gap-1 rounded-md border border-line bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-600 hover:bg-slate-50'
+
   return (
-    <section className="border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div>
-          <p className="text-sm font-bold uppercase tracking-[0.18em] text-court-700">Scorekeeper access</p>
-          <h2 className="mt-2 text-2xl font-black text-slate-950">Share one scoring link per court</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-            Send a court link by text, email, or share sheet. Whoever opens it scores only that court. Regenerate a code
-            if a link should stop being used.
-          </p>
-        </div>
-        <label className="grid gap-1 text-sm font-bold text-slate-700">
-          Courts
-          <input
-            type="number"
-            min={1}
-            max={24}
-            value={courtCount}
-            onChange={(event) => {
-              const value = Number.parseInt(event.target.value, 10)
-              if (Number.isFinite(value)) {
-                const nextCourtCount = Math.min(24, Math.max(1, value))
-                setCourtCount(nextCourtCount)
-                setCourts(buildCourts(nextCourtCount))
-              }
-            }}
-            className="w-28 border border-slate-300 px-3 py-2 text-slate-950"
-          />
-        </label>
+    <Card className="overflow-hidden">
+      <div className="border-b border-line p-6">
+        <SectionHeader
+          eyebrow="Scorekeeper access"
+          title="One scoring link per court"
+          description="Text, email, or share a court link. Whoever opens it scores only that court. Regenerate a code to revoke a link."
+          icon={Ticket}
+          action={
+            <label className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+              Courts
+              <input
+                type="number"
+                min={1}
+                max={24}
+                value={courtCount}
+                onChange={(event) => {
+                  const value = Number.parseInt(event.target.value, 10)
+                  if (Number.isFinite(value)) {
+                    const next = Math.min(24, Math.max(1, value))
+                    setCourtCount(next)
+                    setCourts(buildCourts(next))
+                    setSelectedCourt((current) => Math.min(current, next))
+                  }
+                }}
+                className="w-20 rounded-lg border border-line bg-white px-2 py-1.5 text-sm text-ink focus:border-brand-500 focus:outline-none"
+              />
+            </label>
+          }
+        />
       </div>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className="overflow-hidden border border-slate-200">
+      <div className="grid gap-6 p-6 xl:grid-cols-[1.4fr_1fr]">
+        <div className="overflow-hidden rounded-lg border border-line">
           {links.map((court) => (
-            <div key={court.courtNumber} className="grid gap-3 border-b border-slate-200 p-4 last:border-b-0 lg:grid-cols-[110px_1fr_auto] lg:items-center">
+            <div
+              key={court.courtNumber}
+              className={`grid gap-3 border-b border-line p-4 last:border-b-0 lg:grid-cols-[96px_1fr_auto] lg:items-center ${
+                selectedCourt === court.courtNumber ? 'bg-brand-50/40' : ''
+              }`}
+            >
               <button
                 onClick={() => setSelectedCourt(court.courtNumber)}
-                className={`text-left font-black ${selectedCourt === court.courtNumber ? 'text-court-700' : 'text-slate-950'}`}
+                className={`text-left text-sm font-bold ${selectedCourt === court.courtNumber ? 'text-brand-700' : 'text-ink'}`}
               >
                 {court.label}
               </button>
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-slate-600">{court.url}</p>
-                <p className="mt-1 text-xs font-bold uppercase tracking-wide text-slate-400">Code {court.code}</p>
+                <p className="truncate text-[13px] font-medium text-slate-600">{court.url}</p>
+                <p className="tabular mt-0.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">Code {court.code}</p>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <button onClick={() => copyLink(court)} className="inline-flex items-center gap-1 bg-slate-100 px-3 py-2 text-xs font-black text-slate-700">
-                  {copiedCourt === court.courtNumber ? <Check size={14} /> : <Copy size={14} />}
+              <div className="flex flex-wrap gap-1.5">
+                <button onClick={() => copyLink(court)} className={linkAction}>
+                  {copiedCourt === court.courtNumber ? <Check size={13} /> : <Copy size={13} />}
                   {copiedCourt === court.courtNumber ? 'Copied' : 'Copy'}
                 </button>
-                <a href={`sms:?&body=${encodeURIComponent(court.url)}`} className="inline-flex items-center gap-1 bg-slate-100 px-3 py-2 text-xs font-black text-slate-700">
-                  <MessageSquare size={14} />
+                <a href={`sms:?&body=${encodeURIComponent(court.url)}`} className={linkAction}>
+                  <MessageSquare size={13} />
                   Text
                 </a>
-                <a
-                  href={`mailto:?subject=${encodeURIComponent(`${court.label} scorekeeper link`)}&body=${encodeURIComponent(court.url)}`}
-                  className="inline-flex items-center gap-1 bg-slate-100 px-3 py-2 text-xs font-black text-slate-700"
-                >
-                  <Mail size={14} />
+                <a href={`mailto:?subject=${encodeURIComponent(`${court.label} scorekeeper link`)}&body=${encodeURIComponent(court.url)}`} className={linkAction}>
+                  <Mail size={13} />
                   Email
                 </a>
-                <button onClick={() => shareLink(court)} className="inline-flex items-center gap-1 bg-slate-100 px-3 py-2 text-xs font-black text-slate-700">
-                  <Share2 size={14} />
+                <button onClick={() => shareLink(court)} className={linkAction}>
+                  <Share2 size={13} />
                   Share
                 </button>
-                <button onClick={() => regenerate(court.courtNumber)} className="inline-flex items-center gap-1 bg-slate-950 px-3 py-2 text-xs font-black text-white">
-                  <RefreshCw size={14} />
-                  Regenerate
+                <button
+                  onClick={() => regenerate(court.courtNumber)}
+                  className="inline-flex items-center gap-1 rounded-md bg-ink px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-ink/90"
+                >
+                  <RefreshCw size={13} />
+                  New code
                 </button>
               </div>
             </div>
           ))}
         </div>
 
-        <div className="border border-slate-200 bg-slate-50 p-5">
+        <div className="rounded-lg border border-line bg-slate-50/60 p-5">
           <div className="flex items-center gap-2">
-            <QrCode className="text-court-700" />
-            <p className="font-black text-slate-950">{selectedLink?.label ?? 'Court'} QR</p>
+            <QrCode size={16} className="text-brand-700" />
+            <p className="text-sm font-bold text-ink">{selectedLink?.label ?? 'Court'} QR</p>
           </div>
-          <div className="mt-5 flex justify-center bg-white p-4">
+          <div className="mt-4 flex justify-center rounded-lg bg-white p-4 ring-1 ring-line">
             {qrDataUrl ? (
-              <Image
-                src={qrDataUrl}
-                alt={`${selectedLink?.label ?? 'Court'} scorekeeper QR code`}
-                width={240}
-                height={240}
-                unoptimized
-              />
-            ) : null}
+              <Image src={qrDataUrl} alt={`${selectedLink?.label ?? 'Court'} scorekeeper QR code`} width={220} height={220} unoptimized />
+            ) : (
+              <div className="h-[220px] w-[220px]" />
+            )}
           </div>
-          <p className="mt-4 text-sm leading-6 text-slate-500">
-            QR is optional. If you cannot print, use Copy, Text, Email, or Share for the same court link.
+          <p className="mt-4 text-xs leading-5 text-slate-500">
+            QR is optional — if you can&apos;t print, use Copy, Text, Email, or Share to send the same court link.
           </p>
         </div>
       </div>
-    </section>
+    </Card>
   )
 }

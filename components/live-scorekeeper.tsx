@@ -1,19 +1,21 @@
 'use client'
 
+import { RotateCcw } from 'lucide-react'
 import { StatusPill } from '@/components/status-pill'
+import { Button } from '@/components/ui'
 import { useLiveScores } from '@/lib/use-live-scores'
 import type { LiveState } from '@/lib/live-state'
 
 export function LiveScorekeeper({ initialState }: { initialState: LiveState }) {
   const { state, error, sendAction } = useLiveScores(initialState)
-  const liveState = state ?? initialState
-  const match = liveState.matches.find((candidate) => !candidate.submitted) ?? liveState.matches[0]
+  const live = state ?? initialState
+  const match = live.matches.find((candidate) => !candidate.submitted) ?? live.matches[0]
 
   if (!match) {
     return (
-      <div className="border border-slate-200 bg-white p-8 text-center text-ink shadow-sm">
-        <p className="text-2xl font-black">No match assigned</p>
-        <p className="mt-2 text-sm text-slate-500">Assigned live matches will appear here when the admin publishes the schedule.</p>
+      <div className="rounded-xl border border-white/10 bg-white/[0.04] p-10 text-center">
+        <p className="text-lg font-bold text-white">No match assigned</p>
+        <p className="mt-1.5 text-sm text-slate-400">Your assigned live match will appear here once the schedule is published.</p>
       </div>
     )
   }
@@ -21,30 +23,22 @@ export function LiveScorekeeper({ initialState }: { initialState: LiveState }) {
   const submitted = match.submitted
 
   return (
-    <div className="rounded-[2rem] bg-white p-4 text-ink shadow-panel">
-      <div className="rounded-[1.5rem] bg-slate-100 p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{match.court} · Badminton</p>
-            <h1 className="mt-1 text-2xl font-black">
-              {match.teamA} vs {match.teamB}
-            </h1>
-          </div>
-          <StatusPill tone={submitted ? 'success' : 'warning'}>{submitted ? 'Submitted' : 'Locked to you'}</StatusPill>
+    <div className="overflow-hidden rounded-xl border border-line bg-white text-ink shadow-pop">
+      <div className="flex items-center justify-between gap-3 border-b border-line bg-slate-50 px-5 py-3.5">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{match.court} · {match.division}</p>
+          <h2 className="mt-0.5 text-base font-bold text-ink">
+            {match.teamA} <span className="text-slate-400">vs</span> {match.teamB}
+          </h2>
         </div>
+        <StatusPill tone={submitted ? 'success' : 'warning'} dot={!submitted}>
+          {submitted ? 'Final' : 'Live'}
+        </StatusPill>
       </div>
 
-      <div className="mt-4 rounded-[1.5rem] border border-amber-200 bg-amber-50 p-4">
-        <p className="text-sm font-bold text-amber-800">Live scorekeeper flow</p>
-        <p className="mt-1 text-sm leading-6 text-amber-900">
-          Tap the side that won the rally. When you submit final, this court advances to the next scheduled match. If no
-          match is left for that court, the display keeps the final score.
-        </p>
-      </div>
+      {error ? <p className="border-b border-rose-100 bg-rose-50 px-5 py-2 text-xs font-semibold text-rose-700">{error}</p> : null}
 
-      {error && <p className="mt-4 rounded-2xl bg-rose-50 p-4 text-sm font-bold text-rose-700 ring-1 ring-rose-100">{error}</p>}
-
-      <div className="mt-4 grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-px bg-line">
         {[
           { side: 'A' as const, team: match.teamA, score: match.teamAScore },
           { side: 'B' as const, team: match.teamB, score: match.teamBScore }
@@ -53,43 +47,38 @@ export function LiveScorekeeper({ initialState }: { initialState: LiveState }) {
             key={team.side}
             disabled={submitted}
             onClick={() => sendAction({ action: 'awardPoint', matchId: match.id, side: team.side })}
-            className="rounded-[1.5rem] bg-white p-5 text-left shadow-sm ring-1 ring-slate-200 transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+            className="group flex flex-col items-center bg-white px-4 py-8 transition-colors hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-white"
           >
-            <p className="text-sm font-semibold text-slate-500">{team.team}</p>
-            <p className="mt-4 text-7xl font-black tracking-tight">{team.score}</p>
-            <p className="mt-3 rounded-full bg-court-50 px-3 py-2 text-center text-sm font-bold text-court-700">Award point</p>
+            <span className="line-clamp-1 text-sm font-semibold text-slate-500">{team.team}</span>
+            <span className="tabular mt-2 text-7xl font-bold tracking-tight text-ink">{team.score}</span>
+            {!submitted ? (
+              <span className="mt-4 rounded-lg bg-brand-600 px-4 py-2 text-sm font-bold text-white group-hover:bg-brand-700">
+                +1 Point
+              </span>
+            ) : null}
           </button>
         ))}
       </div>
 
-      <div className="mt-4 rounded-[1.5rem] bg-ink p-5 text-white">
-        <p className="text-sm text-slate-300">Current score string</p>
-        <p className="mt-2 text-3xl font-black">{match.score}</p>
-        <p className="mt-1 text-sm text-slate-300">Badminton rally scoring: every rally awards a point.</p>
+      <div className="border-t border-line px-5 py-3 text-center">
+        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Current score</p>
+        <p className="tabular mt-0.5 text-lg font-bold text-ink">{match.score}</p>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        <button
-          onClick={() => sendAction({ action: 'reset' })}
-          className="rounded-2xl border border-slate-300 px-4 py-4 font-bold text-slate-700"
-        >
+      <div className="grid grid-cols-2 gap-2 border-t border-line p-4">
+        <Button variant="secondary" onClick={() => sendAction({ action: 'reset' })}>
+          <RotateCcw size={15} />
           Reset
-        </button>
-        <button
-          disabled={submitted}
-          onClick={() => sendAction({ action: 'submitMatch', matchId: match.id })}
-          className="rounded-2xl bg-ink px-4 py-4 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Submit final and lock
-        </button>
+        </Button>
+        <Button variant="primary" disabled={submitted} onClick={() => sendAction({ action: 'submitMatch', matchId: match.id })}>
+          Submit final
+        </Button>
       </div>
 
-      <div className="mt-4 rounded-[1.5rem] bg-rose-50 p-4 ring-1 ring-rose-100">
-        <p className="text-sm font-black text-rose-800">Submitted score rule</p>
-        <p className="mt-1 text-sm leading-6 text-rose-900">
-          After final submit, this phone can no longer edit the match. Corrections move to the admin correction workflow.
-        </p>
-      </div>
+      <p className="border-t border-line bg-slate-50 px-5 py-3 text-xs leading-5 text-slate-500">
+        After you submit, this match locks and the court advances to the next scheduled match. Corrections then require
+        admin approval.
+      </p>
     </div>
   )
 }
