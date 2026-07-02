@@ -17,7 +17,7 @@ export function AppHeader({ theme = 'light' }: { theme?: 'light' | 'dark' }) {
         <span className={clsx('flex h-10 w-10 items-center justify-center rounded-2xl', isDark ? 'bg-white text-ink' : 'bg-ink text-white')}>
           <Trophy size={20} />
         </span>
-        <span>Scoring App</span>
+        <span>Tournaments</span>
       </Link>
       <nav
         className={clsx(
