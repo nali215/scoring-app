@@ -14,7 +14,10 @@ export default function DisplayPage() {
 
         <div className="grid flex-1 gap-5 py-6">
           {activeMatches.map((match) => (
-            <article key={match.court} className="grid grid-cols-[220px_1fr_260px_1fr] items-center gap-6 rounded-[2rem] bg-white p-6 text-ink">
+            <article
+              key={match.court}
+              className="grid items-center gap-6 rounded-[2rem] bg-white p-6 text-ink lg:grid-cols-[220px_1fr_260px_1fr]"
+            >
               <div>
                 <p className="text-4xl font-black">{match.court}</p>
                 <p className="mt-2 text-lg font-semibold text-slate-500">{match.division}</p>
@@ -29,4 +32,3 @@ export default function DisplayPage() {
     </main>
   )
 }
-

@@ -17,12 +17,23 @@ export default function ScorekeeperPage() {
             </div>
           </div>
 
+          <div className="mt-4 rounded-[1.5rem] border border-amber-200 bg-amber-50 p-4">
+            <p className="text-sm font-bold text-amber-800">Simple scorekeeper flow</p>
+            <p className="mt-1 text-sm leading-6 text-amber-900">
+              Tap the side that won the rally. The app handles server state, side-outs, game completion, and stale update
+              protection on the server.
+            </p>
+          </div>
+
           <div className="mt-4 grid grid-cols-2 gap-3">
             {[
               ['Patel / Shah', '8'],
               ['Kim / Lopez', '6']
             ].map(([team, score]) => (
-              <button key={team} className="rounded-[1.5rem] bg-white p-5 text-left shadow-sm ring-1 ring-slate-200">
+              <button
+                key={team}
+                className="rounded-[1.5rem] bg-white p-5 text-left shadow-sm ring-1 ring-slate-200 transition active:scale-[0.98]"
+              >
                 <p className="text-sm font-semibold text-slate-500">{team}</p>
                 <p className="mt-4 text-7xl font-black tracking-tight">{score}</p>
                 <p className="mt-3 rounded-full bg-court-50 px-3 py-2 text-center text-sm font-bold text-court-700">Award point</p>
@@ -39,6 +50,12 @@ export default function ScorekeeperPage() {
           <div className="mt-4 grid grid-cols-2 gap-3">
             <button className="rounded-2xl border border-slate-300 px-4 py-4 font-bold text-slate-700">Undo last action</button>
             <button className="rounded-2xl bg-ink px-4 py-4 font-bold text-white">Submit final</button>
+          </div>
+
+          <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs font-bold text-slate-500">
+            <div className="rounded-2xl bg-slate-100 px-2 py-3">Game 1</div>
+            <div className="rounded-2xl bg-ink px-2 py-3 text-white">Game 2 live</div>
+            <div className="rounded-2xl bg-slate-100 px-2 py-3">Best of 3</div>
           </div>
         </div>
       </section>
