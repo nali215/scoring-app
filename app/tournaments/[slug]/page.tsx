@@ -2,10 +2,12 @@ import Link from 'next/link'
 import { AppHeader } from '@/components/app-header'
 import { StatusPill } from '@/components/status-pill'
 import { TournamentTabs } from '@/components/tournament-tabs'
-import { badmintonDemoMatches, badmintonDemoSchedule, badmintonDemoStandings, demoTournaments } from '@/lib/demo-data'
+import { demoTournaments } from '@/lib/demo-data'
+import { getLiveDemoState } from '@/lib/live-demo'
 
 export default function PublicTournamentPage({ params }: { params: { slug: string } }) {
   const tournament = demoTournaments.find((item) => item.slug === params.slug) ?? demoTournaments[0]
+  const initialState = getLiveDemoState()
 
   return (
     <main className="min-h-screen bg-slate-100">
@@ -29,7 +31,7 @@ export default function PublicTournamentPage({ params }: { params: { slug: strin
           </p>
         </div>
 
-        <TournamentTabs matches={badmintonDemoMatches} standings={badmintonDemoStandings} schedule={badmintonDemoSchedule} />
+        <TournamentTabs initialState={initialState} />
       </section>
     </main>
   )

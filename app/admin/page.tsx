@@ -2,7 +2,7 @@ import { CalendarDays, FileSpreadsheet, LockKeyhole, Pencil, Settings2, ShieldCh
 import { AppHeader } from '@/components/app-header'
 import { StatusPill } from '@/components/status-pill'
 import { WorkflowStep } from '@/components/workflow-step'
-import { demoTeams, demoTournaments, divisionOptions, importColumns, sportDefaults } from '@/lib/demo-data'
+import { badmintonDemoSchedule, demoTeams, demoTournaments, divisionOptions, importColumns, sportDefaults } from '@/lib/demo-data'
 
 const setupSteps = [
   ['Login', 'Default demo admin is admin / changeme. Change it after first setup.'],
@@ -18,6 +18,15 @@ const correctionRules = [
   'Final submit locks the match for scorekeepers.',
   'Only admins can reopen or correct submitted scores.',
   'Every admin correction requires a reason and audit entry.'
+]
+
+const adminScheduleActions = [
+  'Move a match to another court',
+  'Change match start time',
+  'Swap match order on a court',
+  'Assign or replace scorekeeper',
+  'Reopen submitted match for correction',
+  'Regenerate remaining schedule after edits'
 ]
 
 export default function AdminPage() {
@@ -211,6 +220,48 @@ export default function AdminPage() {
               <p className="mt-2 text-sm leading-6 text-court-50">
                 Admin can reopen or correct a score only with a reason, so standings remain trustworthy.
               </p>
+            </div>
+          </section>
+        </div>
+
+        <div className="mt-8 grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+          <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+            <div className="flex items-center gap-3">
+              <CalendarDays className="text-court-600" />
+              <div>
+                <p className="text-sm font-bold uppercase tracking-[0.18em] text-court-700">Schedule editor</p>
+                <h2 className="text-3xl font-black text-ink">Admin can adjust courts and matches.</h2>
+              </div>
+            </div>
+            <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
+              {badmintonDemoSchedule.map((match) => (
+                <div key={`${match.time}-${match.court}`} className="grid gap-3 border-b border-slate-200 p-4 last:border-b-0 md:grid-cols-[90px_90px_1fr_auto] md:items-center">
+                  <p className="font-black text-ink">{match.time}</p>
+                  <p className="text-sm font-bold text-court-700">{match.court}</p>
+                  <div>
+                    <p className="font-black text-ink">{match.match}</p>
+                    <p className="text-sm text-slate-500">
+                      {match.division} · {match.phase}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button className="rounded-full bg-slate-100 px-3 py-2 text-xs font-black text-slate-700">Move</button>
+                    <button className="rounded-full bg-slate-100 px-3 py-2 text-xs font-black text-slate-700">Edit</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+            <p className="text-sm font-bold uppercase tracking-[0.18em] text-court-700">Admin controls</p>
+            <h2 className="mt-3 text-3xl font-black text-ink">Allowed schedule changes</h2>
+            <div className="mt-6 space-y-3">
+              {adminScheduleActions.map((action) => (
+                <div key={action} className="rounded-2xl bg-slate-50 p-4 font-bold text-slate-700 ring-1 ring-slate-200">
+                  {action}
+                </div>
+              ))}
             </div>
           </section>
         </div>

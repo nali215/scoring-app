@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { StatusPill } from '@/components/status-pill'
+import { useLiveDemo } from '@/lib/use-live-demo'
+import type { LiveDemoState } from '@/lib/live-demo'
 
 type Match = {
   court: string
@@ -12,6 +14,7 @@ type Match = {
   score: string
   status: string
   editableBy: string
+  time: string
 }
 
 type Standing = {
@@ -45,30 +48,38 @@ function statusTone(status: string): 'neutral' | 'success' | 'warning' | 'danger
 }
 
 export function TournamentTabs({
-  matches,
-  standings,
-  schedule
+  initialState
 }: {
-  matches: Match[]
-  standings: Standing[]
-  schedule: ScheduleItem[]
+  initialState: LiveDemoState
 }) {
   const [activeTab, setActiveTab] = useState<Tab>('Games')
+  const { state, error } = useLiveDemo(initialState)
+  const liveState = state ?? initialState
+  const matches = liveState.matches satisfies Match[]
+  const standings = liveState.standings satisfies Standing[]
+  const schedule = liveState.schedule satisfies ScheduleItem[]
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="sticky top-0 z-10 flex gap-1 border-b border-slate-200 bg-white p-2">
-        {tabs.map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`flex-1 rounded-xl px-4 py-3 text-sm font-black ${
-              activeTab === tab ? 'bg-ink text-white' : 'text-slate-600 hover:bg-slate-100'
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
+      <div className="sticky top-0 z-10 border-b border-slate-200 bg-white p-2">
+        <div className="flex gap-1">
+          {tabs.map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`flex-1 rounded-xl px-4 py-3 text-sm font-black ${
+                activeTab === tab ? 'bg-ink text-white' : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+        <div className="mt-2 flex items-center justify-between px-2 text-xs font-bold text-slate-500">
+          <span>Live refresh every 2s</span>
+          <span>Version {liveState.version}</span>
+        </div>
+        {error && <p className="mt-2 rounded-xl bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">{error}</p>}
       </div>
 
       {activeTab === 'Games' && (
@@ -77,7 +88,7 @@ export function TournamentTabs({
             <article key={`${match.court}-${match.teamA}`} className="p-4 hover:bg-slate-50">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs font-black uppercase tracking-wide text-court-700">
-                  {match.court} · {match.division} · {match.round}
+                  {match.time} · {match.court} · {match.division} · {match.round}
                 </p>
                 <StatusPill tone={statusTone(match.status)}>{match.status}</StatusPill>
               </div>
