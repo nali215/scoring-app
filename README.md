@@ -20,4 +20,3 @@ npm run dev
 ```
 
 Set `DATABASE_URL` before running Prisma migrations.
-
