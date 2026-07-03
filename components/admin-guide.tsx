@@ -23,8 +23,9 @@ const steps: { title: string; body: React.ReactNode }[] = [
     body: (
       <>
         In Google Sheets choose <strong>File → Download → CSV</strong> (or Excel <strong>.xlsx</strong>) and upload it under{' '}
-        <strong>Teams &amp; players</strong>. Columns auto-map — adjust any that are wrong, check the New/Update preview, then
-        Import. Re-upload the same sheet anytime to update existing teams.
+        <strong>Teams &amp; players</strong>. Registration-form exports are detected automatically — the importer merges the
+        gender-split category columns, splits multi-select categories, and reconciles doubles partners into one team. Check the
+        New/Update preview, then Import. Re-upload anytime to update existing teams.
       </>
     )
   },

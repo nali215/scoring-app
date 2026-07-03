@@ -17,6 +17,17 @@ import {
   type MergeResult,
   type RosterFieldKey
 } from '@/lib/roster'
+import {
+  autoMapRegistrationColumns,
+  buildRegistrationTeams,
+  looksLikeRegistration,
+  registrationFields,
+  toRegistrationMapping,
+  type RegistrationColumns,
+  type RegistrationFieldKey
+} from '@/lib/registration'
+
+type ImportFormat = 'team' | 'registration'
 
 const TEMPLATE_HEADERS = [
   'Division',
@@ -39,13 +50,20 @@ export function RosterManager() {
 
   const [parsed, setParsed] = useState<ParsedSheet | null>(null)
   const [mapping, setMapping] = useState<ColumnMapping>({})
+  const [format, setFormat] = useState<ImportFormat>('team')
+  const [regCols, setRegCols] = useState<RegistrationColumns>({})
   const [fileName, setFileName] = useState('')
   const [parseError, setParseError] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
   const [lastImport, setLastImport] = useState<MergeResult[] | null>(null)
 
   const summary = rosterSummary(roster)
-  const draftResult = useMemo(() => (parsed ? buildDraftTeams(parsed.rows, mapping) : null), [parsed, mapping])
+  const draftResult = useMemo(() => {
+    if (!parsed) return null
+    return format === 'registration'
+      ? buildRegistrationTeams(parsed.rows, toRegistrationMapping(regCols))
+      : buildDraftTeams(parsed.rows, mapping)
+  }, [parsed, mapping, regCols, format])
   const preview = useMemo<MergeResult[]>(() => (draftResult ? previewMerge(roster, draftResult.drafts) : []), [draftResult, roster])
   const addedCount = preview.filter((entry) => entry.status === 'added').length
   const updatedCount = preview.filter((entry) => entry.status === 'updated').length
@@ -61,7 +79,15 @@ export function RosterManager() {
         return
       }
       setParsed(sheet)
-      setMapping(autoMapHeaders(sheet.headers))
+      if (looksLikeRegistration(sheet.headers)) {
+        setFormat('registration')
+        setRegCols(autoMapRegistrationColumns(sheet.headers))
+        setMapping(autoMapHeaders(sheet.headers))
+      } else {
+        setFormat('team')
+        setMapping(autoMapHeaders(sheet.headers))
+        setRegCols(autoMapRegistrationColumns(sheet.headers))
+      }
       setFileName(file.name)
     } catch {
       setParseError('Could not read that file. Use a .csv or .xlsx export.')
@@ -109,7 +135,7 @@ export function RosterManager() {
         <SectionHeader
           eyebrow="Teams & players"
           title="Import from Google Forms / Sheets"
-          description="Download your Google Sheet as CSV or Excel and upload it. Matching teams are updated, new teams are added."
+          description="Upload a CSV or Excel export. Google Form registration exports are detected automatically; a plain team list works too. Matching teams are updated, new teams added."
           icon={FileSpreadsheet}
           action={
             <div className="flex flex-wrap gap-2">
@@ -181,24 +207,51 @@ export function RosterManager() {
 
           <div className="mt-4 grid gap-3 lg:grid-cols-2">
             <div className="overflow-hidden rounded-lg border border-line">
-              <p className="border-b border-line bg-slate-50 px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-500">1 · Map columns</p>
+              <div className="flex flex-col gap-2 border-b border-line bg-slate-50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">1 · Map columns</p>
+                <div className="inline-flex rounded-lg border border-line bg-white p-0.5">
+                  {(['registration', 'team'] as ImportFormat[]).map((option) => (
+                    <button
+                      key={option}
+                      onClick={() => setFormat(option)}
+                      className={`rounded-md px-2.5 py-1 text-[11px] font-bold ${format === option ? 'bg-ink text-white' : 'text-slate-500'}`}
+                    >
+                      {option === 'registration' ? 'Registration form' : 'Team list'}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="max-h-72 space-y-2 overflow-auto p-3">
                 {parsed.headers.map((header, index) => (
                   <div key={index} className="grid grid-cols-2 items-center gap-2">
                     <span className="truncate text-sm font-medium text-slate-600" title={header}>
                       {header || `Column ${index + 1}`}
                     </span>
-                    <select
-                      value={mapping[index] ?? 'ignore'}
-                      onChange={(event) => setMapping((current) => ({ ...current, [index]: event.target.value as RosterFieldKey }))}
-                      className="rounded-lg border border-line bg-white px-2 py-1.5 text-sm text-ink focus:border-brand-500 focus:outline-none"
-                    >
-                      {rosterFields.map((field) => (
-                        <option key={field.key} value={field.key}>
-                          {field.label}
-                        </option>
-                      ))}
-                    </select>
+                    {format === 'registration' ? (
+                      <select
+                        value={regCols[index] ?? 'ignore'}
+                        onChange={(event) => setRegCols((current) => ({ ...current, [index]: event.target.value as RegistrationFieldKey }))}
+                        className="rounded-lg border border-line bg-white px-2 py-1.5 text-sm text-ink focus:border-brand-500 focus:outline-none"
+                      >
+                        {registrationFields.map((field) => (
+                          <option key={field.key} value={field.key}>
+                            {field.label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <select
+                        value={mapping[index] ?? 'ignore'}
+                        onChange={(event) => setMapping((current) => ({ ...current, [index]: event.target.value as RosterFieldKey }))}
+                        className="rounded-lg border border-line bg-white px-2 py-1.5 text-sm text-ink focus:border-brand-500 focus:outline-none"
+                      >
+                        {rosterFields.map((field) => (
+                          <option key={field.key} value={field.key}>
+                            {field.label}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                 ))}
               </div>
@@ -222,7 +275,11 @@ export function RosterManager() {
                     </div>
                   ))
                 ) : (
-                  <p className="p-4 text-sm text-slate-500">Map at least Division and Player 1 first name to see a preview.</p>
+                  <p className="p-4 text-sm text-slate-500">
+                    {format === 'registration'
+                      ? 'Map Name, Category, and Partner columns to see a preview.'
+                      : 'Map at least Division and Player 1 first name to see a preview.'}
+                  </p>
                 )}
               </div>
             </div>
