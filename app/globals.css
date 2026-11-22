@@ -15,7 +15,7 @@ input:not([type=checkbox]),select,textarea{width:100%;border:1px solid #c8d3df;b
 
 .search-field input{border:0;background:transparent;padding:12px 0;border-radius:0}
 
-.schedule-mobile{display:none}@media(max-width:760px){.schedule-panel:has(.schedule-mobile)>.table-scroll{display:none}.schedule-mobile{display:block;padding:0 16px 16px}.schedule-mobile .match-card .row-between{flex-wrap:nowrap}.schedule-mobile .match-card .division{font-size:.75rem}}@media print{.schedule-mobile{display:none!important}.schedule-panel:has(.schedule-mobile)>.table-scroll{display:block!important}}
+.schedule-mobile{display:none}@media(max-width:1100px){.schedule-panel:has(.schedule-mobile)>.table-scroll{display:none}.schedule-mobile{display:block;padding:0 16px 16px}.schedule-mobile .match-card .row-between{flex-wrap:nowrap}.schedule-mobile .match-card .division{font-size:.75rem}}@media print{.schedule-mobile{display:none!important}.schedule-panel:has(.schedule-mobile)>.table-scroll{display:block!important}}
 
 /* Touch-first scoring and fixed three-court monitor */
 .scorer-login{display:grid;gap:20px}.account-username{font-size:1.8rem;font-weight:800}.account-signin{padding:0 26px 26px;display:grid;gap:12px}
