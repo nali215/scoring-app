@@ -12,7 +12,7 @@ export function SignOutButton() {
   async function signOut() {
     setPending(true)
     await fetch('/api/admin/logout', { method: 'POST' })
-    router.push('/admin/login')
+    router.push('/')
     router.refresh()
   }
 

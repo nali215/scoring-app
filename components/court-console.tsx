@@ -1,0 +1,38 @@
+'use client'
+import {useState} from 'react'
+import Link from 'next/link'
+import {Check,Play,Plus,Minus} from 'lucide-react'
+import {useEvent} from '@/lib/use-event'
+import {teamName,matchScore,playerName,type Match,type EventView} from '@/lib/event-types'
+import {doublesService} from '@/lib/doubles-service'
+import {DivisionBadge,Loading,Notice,MatchCard} from './event-shared'
+export function CourtConsole({court}:{court:number}){
+ const api=useEvent(court),{state,error,pending}=api
+ const [selected,setSelected]=useState<number|null>(null),[serving,setServing]=useState<'A'|'B'>('A'),[server,setServer]=useState(0),[receiver,setReceiver]=useState(0)
+ if(api.loading)return <main className="scorer-container"><Loading/></main>
+ if(!state)return <main className="scorer-container"><Notice error>{error||'Sign in with the assigned court account.'} <Link href="/scorekeeper">Scorer sign in</Link></Notice></main>
+ const matches=state.matches.filter(m=>m.court===court),active=matches.find(m=>m.status==='Live'||m.status==='Awaiting confirmation')
+ const match=active??matches.find(m=>m.number===selected&&m.status==='Scheduled')??matches.find(m=>m.status==='Scheduled'&&m.a.team&&m.b.team)
+ const game=match?.games.at(-1),index=(match?.games.length??0)-1
+ const service=match&&game?doublesService(match.starts[index],match.rallies[index]):null
+ const blocked=pending||Boolean(error)||!state.published
+ const send=(action:string,extra:object={})=>match&&void api.send({action,match:match.number,version:match.version,...extra})
+ return <main className="scorer-container"><div className="scorer-heading"><span className="eyebrow">{state.scorerNames[String(court)]}</span><h1>Court {court}</h1><p>{pending?'Saving…':error?'Connection needs attention':`Synced ${api.lastSync}`}</p></div>
+ {error&&<Notice error>{error} <button className="text-button" onClick={()=>void api.refresh()}>Refresh</button> <Link href="/scorekeeper">Sign in</Link></Notice>}
+ {!state.published&&<Notice>The organizer must publish the event before scoring begins.</Notice>}
+ {!match?<div className="empty-panel"><Check size={32}/><h2>{matches.every(m=>m.status==='Final')?'Court complete':'Waiting for the next matchup'}</h2></div>:
+ <section className="scoring-panel"><div className="scorer-match-header"><DivisionBadge division={match.division}/><Link href={`/matches/${match.number}`}>Match #{match.number} · History</Link><p>{match.round} · {match.round==='Round robin'?'1 game':'Best of 3'} to 21 · win by {state.settings.winBy} · cap {state.settings.cap}</p></div>
+ {match.status==='Scheduled'?<div className="start-match"><div className="match-names"><strong>{teamName(state,match.a)}</strong><span className="versus">vs</span><strong>{teamName(state,match.b)}</strong></div><label>First serving team<select value={serving} onChange={e=>{setServing(e.target.value as 'A'|'B');setServer(0);setReceiver(0)}}><option value="A">{teamName(state,match.a)}</option><option value="B">{teamName(state,match.b)}</option></select></label><FirstPlayers state={state} match={match} serving={serving} server={server} receiver={receiver} onServer={setServer} onReceiver={setReceiver}/><button className="btn gold full-width" disabled={blocked||!match.a.team||!match.b.team} onClick={()=>send('start',{serving,server,receiver})}><Play size={18}/>Start match</button></div>:<>
+ <div className="service-banner"><span>GAME {match.games.length} · {game?.winnerSide?'GAME COMPLETE':'NOW SERVING'}</span><strong>{game?.winnerSide?`${teamName(state,game.winnerSide==='A'?match.a:match.b)} wins game`:service?playerName(state,match,service.serving,service.server):''}</strong>{service&&!game?.winnerSide&&<p>{service.court==='right'?'Right':'Left'} service court · receiving: <b>{playerName(state,match,service.receiving,service.receiver)}</b></p>}</div>
+ <div className="score-team-grid">{(['A','B'] as const).map(side=>{const score=side==='A'?game!.teamAScore:game!.teamBScore;return <div className={`score-team ${service?.serving===side&&!game?.winnerSide?'serving-team':''}`} key={side}><h2>{teamName(state,side==='A'?match.a:match.b)}</h2><strong className="big-score">{score}</strong><div className="point-controls"><button aria-label={`Remove point from ${teamName(state,side==='A'?match.a:match.b)}`} className="minus-point" disabled={blocked||score===0} onClick={()=>send('removePoint',{side})}><Minus size={26}/></button><button aria-label={`Add point to ${teamName(state,side==='A'?match.a:match.b)}`} className="plus-point" disabled={blocked||Boolean(game?.winnerSide)||match.status!=='Live'} onClick={()=>send('point',{side})}><Plus size={34}/></button></div></div>})}</div>
+ <div className="score-history">Games: <strong>{matchScore(match)}</strong></div>
+ {game?.winnerSide&&match.status==='Live'&&<div className="next-game"><p>Review the score, then choose the first server and receiver for game {match.games.length+1}.</p><FirstPlayers state={state} match={match} serving={game.winnerSide} server={server} receiver={receiver} onServer={setServer} onReceiver={setReceiver}/><button className="btn gold full-width" disabled={blocked} onClick={()=>send('nextGame',{server,receiver})}>Start game {match.games.length+1}</button></div>}
+ {match.status==='Awaiting confirmation'&&<div className="scoring-actions"><button className="btn gold full-width" disabled={blocked} onClick={()=>{if(window.confirm(`Confirm final result: ${matchScore(match)}? Once confirmed, corrections require the organizer.`))send('submit')}}><Check size={18}/>Confirm final result</button></div>}
+ <p className="helper scorer-helper">+ adds a point. − removes that team’s latest point in this game and updates service. If a point went to the wrong team, subtract it there, then add it to the correct team.</p>
+ </>}</section>}
+ {!active&&<section className="queue"><h2>Next matches</h2>{matches.filter(m=>m.status==='Scheduled').map(m=><MatchCard key={m.number} state={state} match={m} action={<button className="btn full-width" disabled={!m.a.team||!m.b.team||blocked} onClick={()=>setSelected(m.number)}>{m.a.team&&m.b.team?'Select match':'Waiting for teams'}</button>}/>)}</section>}
+ </main>
+}
+function FirstPlayers({state,match,serving,server,receiver,onServer,onReceiver}:{state:EventView;match:Match;serving:'A'|'B';server:number;receiver:number;onServer:(n:number)=>void;onReceiver:(n:number)=>void}){
+ return <div className="two-fields"><label>First server<select value={server} onChange={e=>onServer(Number(e.target.value))}>{[0,1].map(i=><option key={i} value={i}>{playerName(state,match,serving,i)}</option>)}</select></label><label>First receiver<select value={receiver} onChange={e=>onReceiver(Number(e.target.value))}>{[0,1].map(i=><option key={i} value={i}>{playerName(state,match,serving==='A'?'B':'A',i)}</option>)}</select></label></div>
+}

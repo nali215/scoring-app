@@ -1,26 +1,4 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
 import './globals.css'
-
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-sans',
-  display: 'swap'
-})
-
-export const metadata: Metadata = {
-  title: 'Scoring — Tournament Operations',
-  description: 'Professional pickleball and badminton tournament scoring, scheduling, and live standings.'
-}
-
-export default function RootLayout({
-  children
-}: Readonly<{
-  children: React.ReactNode
-}>) {
-  return (
-    <html lang="en" className={inter.variable}>
-      <body>{children}</body>
-    </html>
-  )
-}
+export const metadata: Metadata = { title: 'URC Southwest | Badminton 2026', description: 'Tournament schedule, court scores and results for URC Southwest Badminton.', referrer: 'no-referrer' }
+export default function RootLayout({ children }: { children: React.ReactNode }) { return <html lang="en"><body>{children}</body></html> }
