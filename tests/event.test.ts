@@ -37,7 +37,7 @@ describe('scoring safety',()=>{
   it('denies missing, revoked and cross-court credentials',()=>{
     const s=ready(),a=actionSchema.parse({action:'start',coinTossWinner:'A',match:1,version:0,requestId:randomUUID()})
     expect(()=>applyEventAction(s,a,{admin:false,court:1,session:'wrong'})).toThrow('session ended')
-    expect(()=>applyEventAction(s,a,{admin:false,court:2,session:s.courtSessions['2']})).toThrow('assigned court')
+    expect(()=>applyEventAction(s,actionSchema.parse({action:'point',match:1,version:0,side:'A',requestId:randomUUID()}),{admin:false,court:2,session:s.courtSessions['2']})).toThrow('only matches')
     const old=s.courtSessions['1']
     applyEventAction(s,actionSchema.parse({action:'releaseScorer',court:1,version:s.version,requestId:randomUUID()}),{admin:true})
     expect(()=>applyEventAction(s,a,{admin:false,court:1,session:old})).toThrow('session ended')

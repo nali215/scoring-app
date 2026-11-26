@@ -11,7 +11,7 @@ const common = { requestId: z.string().uuid(), version: z.number().int().nonnega
 const matchFields = { ...common, match: z.number().int().min(1).max(53) }
 const firstPlayers = { server: z.union([z.literal(0),z.literal(1)]).default(0), receiver: z.union([z.literal(0),z.literal(1)]).default(0) }
 export const actionSchema = z.discriminatedUnion('action', [
-  z.object({ ...matchFields, ...firstPlayers, action: z.literal('start'), coinTossWinner: z.enum(['A', 'B']), serving: z.enum(['A', 'B']).default('A') }),
+  z.object({ ...matchFields, ...firstPlayers, action: z.literal('start'), coinTossWinner: z.enum(['A', 'B']), court: z.number().int().min(1).max(3).optional(), serving: z.enum(['A', 'B']).default('A') }),
   z.object({ ...matchFields, action: z.literal('point'), side: z.enum(['A', 'B']) }),
   z.object({ ...matchFields, action: z.literal('removePoint'), side: z.enum(['A', 'B']) }),
   z.object({ ...matchFields, ...firstPlayers, action: z.literal('nextGame') }),
@@ -80,7 +80,7 @@ export function applyEventAction(state: EventState, action: EventAction, actor: 
   if ('match' in action) {
     const match = state.matches.find(m => m.number === action.match)
     requireThat(match, 'Match not found.', 404)
-    requireThat(actor.admin || actor.court === match.court, 'This link can score only its assigned court.', 403)
+    requireThat(actor.admin || actor.court === match.court || (action.action === 'start' && match.status === 'Scheduled'), 'This account can score only matches playing on its court.', 403)
     requireThat(match.version === action.version, 'This match changed on another device. Review the latest score and try again.', 409)
     const oldGameIndex=match.games.length-1
     const beforeService=oldGameIndex>=0?doublesService(match.starts[oldGameIndex],match.rallies[oldGameIndex]):null
@@ -105,13 +105,17 @@ export function applyEventAction(state: EventState, action: EventAction, actor: 
     } else if (action.action === 'start') {
       requireThat(match.status === 'Scheduled', 'Match has already started.')
       requireThat(match.a.team && match.b.team, 'Finalize rankings or complete the preceding matches first.')
+      const targetCourt = actor.admin ? (action.court ?? match.court) : actor.court
+      requireThat(actor.admin || action.court === undefined || action.court === actor.court, 'Start matches on your signed-in court.', 403)
+      const previousCourt = match.court
       const busy = state.matches.filter(m => m.status === 'Live' || m.status === 'Awaiting confirmation')
-      requireThat(!busy.some(m => m.court === match.court), 'Another match is still active on this court.')
+      requireThat(!busy.some(m => m.court === targetCourt), 'Another match is still active on this court.')
       const players = playerIds(state, match)
       requireThat(!busy.some(m => playerIds(state, m).some(p => players.includes(p))), 'A player is still playing on another court.')
       if (match.round === 'Final') requireThat(!state.matches.some(m => m.round === 'Final' && m.number < match.number && m.status !== 'Final'), 'Complete the earlier final first. Finals are consecutive.')
+      match.court = targetCourt
       match.coinToss = { winner: action.coinTossWinner, at: new Date().toISOString() };
-      detail = `Coin toss won by ${state.teams.find(t => t.id === (action.coinTossWinner === 'A' ? match.a.team : match.b.team))!.name}. First serving team: ${action.serving}.`;
+      detail = `Started on Court ${targetCourt}${previousCourt !== targetCourt ? ` (moved from Court ${previousCourt})` : ''}. Coin toss won by ${state.teams.find(t => t.id === (action.coinTossWinner === 'A' ? match.a.team : match.b.team))!.name}. First serving team: ${action.serving}.`;
       match.games = [createBadmintonGame(action.serving)]; match.rallies = [[]]; match.starts=[{serving:action.serving,server:action.server,receiver:action.receiver}]; match.status = 'Live'
     } else if (action.action === 'point') {
       requireThat(match.status === 'Live', 'This match is not accepting points.')
