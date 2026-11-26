@@ -1,0 +1,12 @@
+import { describe, it, expect } from 'vitest'
+import { randomUUID } from 'node:crypto'
+import { createEvent } from '@/lib/event-seed'
+import { applyEventAction, actionSchema } from '@/lib/event-engine'
+function fixture(){const state=createEvent();state.matches.filter(m=>m.division==='legends'&&m.round==='Round robin').forEach(m=>{m.status='Final';m.winner=m.a.team});const teams=state.teams.filter(t=>t.division==='legends').map(t=>t.id);return {state,teams}}
+function action(state:ReturnType<typeof createEvent>,teams:string[],winner=teams[0]){return actionSchema.parse({action:'coinToss',division:'legends',teams,winner,note:'Tie for seed 2',version:state.version,requestId:randomUUID()})}
+describe('recorded coin-toss tie breaks',()=>{
+ it('persists a multi-team winner, audit and note without changing scores or seeds; duplicate requests are idempotent',()=>{const {state,teams}=fixture();const matches=JSON.stringify(state.matches),a=action(state,teams);applyEventAction(state,a,{admin:true});expect(state.coinTosses?.[0]).toMatchObject({teams,winner:teams[0],note:'Tie for seed 2',actor:'Admin'});expect(state.audit.at(-1)?.detail).toContain('Winner:');expect(JSON.stringify(state.matches)).toBe(matches);expect(state.seeds).toEqual({});applyEventAction(state,a,{admin:true});expect(state.coinTosses).toHaveLength(1)})
+ it('rejects invalid participants or an unrelated winner',()=>{const {state,teams}=fixture();expect(()=>applyEventAction(state,action(state,[teams[0],teams[0]]),{admin:true})).toThrow('different teams');expect(()=>applyEventAction(state,action(state,teams.slice(0,2),teams[2]),{admin:true})).toThrow('winner must');expect(()=>applyEventAction(state,action(state,[teams[0],'men-1']),{admin:true})).toThrow('different teams')})
+ it('requires completed round robin and unlocked seeds',()=>{const {state,teams}=fixture();state.matches.find(m=>m.division==='legends')!.status='Scheduled';expect(()=>applyEventAction(state,action(state,teams),{admin:true})).toThrow('Complete all');state.matches.filter(m=>m.division==='legends'&&m.round==='Round robin').forEach(m=>m.status='Final');state.seeds.legends=teams;expect(()=>applyEventAction(state,action(state,teams),{admin:true})).toThrow('Clear this')})
+ it('forbids court scorers from recording a toss',()=>{const {state,teams}=fixture();state.courtSessions['1']='session';expect(()=>applyEventAction(state,action(state,teams),{admin:false,court:1,session:'session'})).toThrow('Administrator access')})
+})

@@ -23,6 +23,7 @@ export const actionSchema = z.discriminatedUnion('action', [
   z.object({ ...common, action: z.literal('team'), id: z.string().max(40), name: z.string().trim().min(3).max(100), players: z.array(z.string().trim().min(1).max(80)).length(2), checkedIn: z.boolean() }),
   z.object({ ...common, action: z.literal('seed'), division, order: z.array(z.string().max(40)).min(4).max(9) }),
   z.object({ ...common, action: z.literal('clearSeeds'), division }),
+  z.object({ ...common, action: z.literal('coinToss'), division, teams: z.array(z.string().max(40)).min(2).max(9), winner: z.string().max(40), note: z.string().trim().max(300).default('') }),
   z.object({ ...common, action: z.literal('scorer'), court: z.number().int().min(1).max(3), name: z.string().trim().min(1).max(80), enabled: z.boolean() }),
   z.object({ ...common, action: z.literal('releaseScorer'), court: z.number().int().min(1).max(3) })
 ])
@@ -169,6 +170,17 @@ export function applyEventAction(state: EventState, action: EventAction, actor: 
       team.name = action.name; team.players = identities; team.checkedIn = action.checkedIn
       const conflicts = scheduleConflicts(state)
       requireThat(!conflicts.length, conflicts[0] ?? '')
+    } else if (action.action === 'coinToss') {
+      unstartedKnockouts(state, action.division)
+      requireThat(!state.seeds[action.division], 'Clear this division’s seeds before recording a tie-break correction.')
+      requireThat(state.matches.filter(m => m.division === action.division && m.round === 'Round robin').every(m => m.status === 'Final'), 'Complete all round-robin matches in this division first.')
+      const ids = state.teams.filter(t => t.division === action.division).map(t => t.id)
+      requireThat(new Set(action.teams).size === action.teams.length && action.teams.every(id => ids.includes(id)), 'Select different teams from this division.')
+      requireThat(action.teams.includes(action.winner), 'The toss winner must be one of the selected teams.')
+      const name = (id: string) => state.teams.find(t => t.id === id)!.name
+      state.coinTosses ??= []
+      state.coinTosses.push({ id: action.requestId, division: action.division, teams: action.teams, winner: action.winner, note: action.note, at: new Date().toISOString(), actor: 'Admin' })
+      detail = `Coin toss: ${action.teams.map(name).join(' vs ')}. Winner: ${name(action.winner)}.${action.note ? ` ${action.note}` : ''}`
     } else if (action.action === 'seed') {
       unstartedKnockouts(state, action.division)
       requireThat(state.matches.filter(m => m.division === action.division && m.round === 'Round robin').every(m => m.status === 'Final'), 'Complete all round-robin matches in this division first.')

@@ -18,6 +18,7 @@ export type EventState = {
   schema: 1; version: number; updatedAt: string; published: boolean;
   settings: { name: string; date: string; venue: string; timezone: string; note: string; winBy: number; cap: number; reviewed: boolean };
   teams: Team[]; matches: Match[]; seeds: Partial<Record<Division, string[]>>;
+  coinTosses?: { id: string; division: Division; teams: string[]; winner: string; note: string; at: string; actor: string }[];
   courtSessions: Record<string, string>;
   scorerNames: Record<string, string>;
   scorerEnabled: Record<string, boolean>;
