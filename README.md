@@ -105,3 +105,7 @@ npm run build
 Coverage includes source counts/assignments, all 53 matches, seeding, service rotation, wrong-team corrections, authorization, session transfer, persistence, concurrency, and revocation.
 
 This workflow is scoped to the supplied URC event. It does not implement general tournament creation, player registration/payments, walkover adjudication, or offline score syncing.
+
+## Host correction during play — November 26
+
+The live PostgreSQL event has three Legends teams: Altuali/Karim, Nash/Amik, and Rizwan/Anif. The scored Naushad/Rafiq entry (legends-3) was corrected to Nash/Amik, retaining its team ID and all scores. The unused Nasir/Nash entry was removed. Round-robin fixtures 11, 13, 20, 21, 28, 33 now cover each pairing twice; the top two play final 51 directly. Unstarted semifinals 45 and 48 were removed. All played matches were verified unchanged for games, rallies, starts, snapshots, status, winners, tosses and team slots. Serving-name labels were corrected. The live database and its backup contain this event correction; the original workbook seed remains a source snapshot, not a restore of current tournament state.

@@ -23,7 +23,7 @@ export const actionSchema = z.discriminatedUnion('action', [
   z.object({ ...common, action: z.literal('settings'), settings: z.object({ name: z.string().trim().min(3).max(100), date: z.string().date(), venue: z.string().trim().max(200), note: z.string().trim().max(1000), winBy: z.number().int().min(1).max(2), cap: z.number().int().min(21).max(50), reviewed: z.boolean() }) }),
   z.object({ ...common, action: z.literal('publish'), published: z.boolean() }),
   z.object({ ...common, action: z.literal('team'), id: z.string().max(40), name: z.string().trim().min(3).max(100), players: z.array(z.string().trim().min(1).max(80)).length(2), checkedIn: z.boolean() }),
-  z.object({ ...common, action: z.literal('seed'), division, order: z.array(z.string().max(40)).min(4).max(9) }),
+  z.object({ ...common, action: z.literal('seed'), division, order: z.array(z.string().max(40)).min(3).max(9) }),
   z.object({ ...common, action: z.literal('clearSeeds'), division }),
   z.object({ ...common, action: z.literal('coinToss'), division, teams: z.array(z.string().max(40)).min(2).max(9), winner: z.string().max(40), note: z.string().trim().max(300).default('') }),
   z.object({ ...common, action: z.literal('scorer'), court: z.number().int().min(1).max(3), name: z.string().trim().min(1).max(80), enabled: z.boolean() }),
