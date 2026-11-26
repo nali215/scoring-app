@@ -4,7 +4,7 @@ A phone/iPad scoring app and a dedicated three-court monitor display for Novembe
 
 ## Source and event setup
 
-The event starts as an unpublished draft: 21 teams, 36 opening matches, 17 knockouts, three courts. data/urc-2026.json follows the workbook's **MASTER SCHEDULE**, including match 39 on Court 1, match 40 on Court 2, and match 41 on Court 3. Posters provide visual direction only. Source team numbers are stable IDs, not playoff rankings. Registration contact details are not imported.
+The event starts as an unpublished draft: 21 teams, 36 opening matches, 17 knockouts, three courts. data/urc-2026.json follows the workbook's **MASTER SCHEDULE**, including match 39 on Court 1, match 40 on Court 2, and match 41 on Court 3. Posters provide visual direction only. Source team numbers are stable IDs, not playoff rankings. Registration contact details are not imported. Organizer correction: Amik/Faiz is now Amik/Alim (team men-7); all four source fixtures retain their original assignments.
 
 Enter the venue, review player identities, and confirm the rules before publishing. The source has one game to 21 for opening rounds and best of three to 21 for knockouts. Win-by-two and a 30-point cap are proposed editable defaults. Suggested rankings use wins, point difference, then points scored; an organizer must resolve remaining ties and confirm seeds.
 
