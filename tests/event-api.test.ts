@@ -27,9 +27,9 @@ describe('event API authorization and visibility',()=>{
   })
   it('allows a valid court to score only that court and never exposes private keys',async()=>{
     await mutateEvent(s=>{s.published=true;s.courtSessions={'1':'court-one-token'};return s})
-    session.scorer={court:1,session:'court-one-token'};const response=await post({action:'start',match:1,version:0},{'x-court-token':'court-one-token'},'?court=1')
+    session.scorer={court:1,session:'court-one-token'};const response=await post({action:'start',coinTossWinner:'A',match:1,version:0},{'x-court-token':'court-one-token'},'?court=1')
     expect(response.status).toBe(200);expect(await response.json()).not.toHaveProperty('courtSessions')
-    expect((await post({action:'start',match:2,version:0},{'x-court-token':'court-one-token'},'?court=1')).status).toBe(403)
+    expect((await post({action:'start',coinTossWinner:'A',match:2,version:0},{'x-court-token':'court-one-token'},'?court=1')).status).toBe(403)
     expect((await post({action:'releaseScorer',court:2},{'x-court-token':'court-one-token'},'?court=1')).status).toBe(403)
   })
 })

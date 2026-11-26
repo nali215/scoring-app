@@ -23,7 +23,7 @@ describe('doubles player service order',()=>{
  it('records the actual serving player and supports wrong-team correction with minus then plus',()=>{
   const s=createEvent();s.published=true
   const act=(body:object)=>applyEventAction(s,actionSchema.parse({requestId:randomUUID(),version:s.matches[0].version,match:1,...body}),{admin:true})
-  act({action:'start',serving:'A',server:0,receiver:0});act({action:'point',side:'B'})
+  act({action:'start',coinTossWinner:'A',serving:'A',server:0,receiver:0});act({action:'point',side:'B'})
   expect(s.matches[0].log[1]).toMatchObject({server:'Moshin',receiver:'Ayaan',score:'0–1',nextServer:'Abeer',serviceCourt:'left'})
   act({action:'removePoint',side:'B'});act({action:'point',side:'A'})
   expect(s.matches[0].games[0]).toMatchObject({teamAScore:1,teamBScore:0})

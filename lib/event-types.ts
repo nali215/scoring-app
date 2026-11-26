@@ -9,6 +9,7 @@ export type Slot = { team?: string; seed?: number; winner?: number }
 export type Match = {
   number: number; division: Division; round: 'Round robin' | 'Quarterfinal' | 'Semifinal' | 'Final'; court: number; time: string;
   a: Slot; b: Slot; games: GameSnapshot[]; status: 'Scheduled' | 'Live' | 'Awaiting confirmation' | 'Final';
+  coinToss?: { winner: 'A' | 'B'; at: string };
   winner?: string; version: number; history: { games: GameSnapshot[]; status: Match['status'] }[];
   rallies: ('A' | 'B')[][];
   starts: ServiceStart[];

@@ -19,7 +19,7 @@ describe('court username/password sessions',()=>{
   expect(auth.court).toBe(1);expect((await readEvent()).courtSessions['1']).toBe(auth.session)
   const second=await login();expect(second.status).toBe(200)
   const state=await readEvent();expect(state.courtSessions['1']).not.toBe(auth.session)
-  expect(()=>applyEventAction(state,actionSchema.parse({action:'start',match:1,version:0,requestId:randomUUID()}),{admin:false,...auth})).toThrow('session ended')
+  expect(()=>applyEventAction(state,actionSchema.parse({action:'start',coinTossWinner:'A',match:1,version:0,requestId:randomUUID()}),{admin:false,...auth})).toThrow('session ended')
  })
  it('rejects a wrong password and disabled court',async()=>{
   expect((await login('court1','wrong')).status).toBe(401)

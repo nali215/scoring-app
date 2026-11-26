@@ -11,7 +11,7 @@ function action(s:EventState, body:Record<string,unknown>, court?:number) {
   return applyEventAction(s, actionSchema.parse({requestId:randomUUID(),version:match?.version??s.version,...body}), court?{admin:false,court,session:s.courtSessions[String(court)]}:{admin:true})
 }
 function finish(s:EventState,n:number,side='A') {
-  action(s,{action:'start',match:n})
+  action(s,{action:'start',coinTossWinner:'A',match:n})
   const m=s.matches.find(m=>m.number===n)!
   while(m.status==='Live'){if(m.games.at(-1)?.winnerSide)action(s,{action:'nextGame',match:n});else action(s,{action:'point',match:n,side})}
   action(s,{action:'submit',match:n})
@@ -35,7 +35,7 @@ describe('URC source import',()=>{
 })
 describe('scoring safety',()=>{
   it('denies missing, revoked and cross-court credentials',()=>{
-    const s=ready(),a=actionSchema.parse({action:'start',match:1,version:0,requestId:randomUUID()})
+    const s=ready(),a=actionSchema.parse({action:'start',coinTossWinner:'A',match:1,version:0,requestId:randomUUID()})
     expect(()=>applyEventAction(s,a,{admin:false,court:1,session:'wrong'})).toThrow('session ended')
     expect(()=>applyEventAction(s,a,{admin:false,court:2,session:s.courtSessions['2']})).toThrow('assigned court')
     const old=s.courtSessions['1']
@@ -44,7 +44,7 @@ describe('scoring safety',()=>{
   })
   it('rejects forged actions, stale versions, premature finals and global resets',()=>{
     const s=ready();expect(actionSchema.safeParse({action:'reset'}).success).toBe(false)
-    action(s,{action:'start',match:1})
+    action(s,{action:'start',coinTossWinner:'A',match:1})
     expect(()=>action(s,{action:'submit',match:1})).toThrow('Finish')
     expect(()=>action(s,{action:'point',match:1,side:'A',version:0})).toThrow('changed')
     const requestId=randomUUID(),version=s.matches[0].version
@@ -53,7 +53,7 @@ describe('scoring safety',()=>{
     expect(s.matches[0].games[0].teamAScore).toBe(1)
   })
   it('undoes the final rally and advances best-of-three games correctly',()=>{
-    const s=ready();action(s,{action:'start',match:1})
+    const s=ready();action(s,{action:'start',coinTossWinner:'A',match:1})
     for(let i=0;i<21;i++)action(s,{action:'point',match:1,side:'A'})
     expect(s.matches[0].status).toBe('Awaiting confirmation')
     action(s,{action:'removePoint',match:1,side:'A'});expect(s.matches[0].games[0].teamAScore).toBe(20)
@@ -63,11 +63,11 @@ describe('scoring safety',()=>{
     expect(()=>action(s,{action:'point',match:1,side:'B'})).toThrow('not accepting')
   })
   it('blocks a shared player from starting simultaneously on another court',()=>{
-    const s=ready();action(s,{action:'start',match:2})
-    expect(()=>action(s,{action:'start',match:7})).toThrow('another court')
+    const s=ready();action(s,{action:'start',coinTossWinner:'A',match:2})
+    expect(()=>action(s,{action:'start',coinTossWinner:'A',match:7})).toThrow('another court')
   })
   it('does not expose keys, audit or point history publicly',()=>{
-    const s=ready();action(s,{action:'start',match:1});action(s,{action:'point',match:1,side:'A'})
+    const s=ready();action(s,{action:'start',coinTossWinner:'A',match:1});action(s,{action:'point',match:1,side:'A'})
     const view=publicView(s)
     expect(view).not.toHaveProperty('courtSessions');expect(view).not.toHaveProperty('audit');expect(view.matches[0].history).toEqual([])
   })
@@ -80,7 +80,7 @@ describe('complete tournament rehearsal',()=>{
     for(const d of divisions)action(s,{action:'seed',division:d,order:standings(s,d).map(r=>r.team.id)})
     expect(s.matches[36].a.team).toBe(s.seeds.men![0]);expect(s.matches[36].b.team).toBe(s.seeds.men![7])
     for(let n=37;n<=50;n++)finish(s,n)
-    expect(()=>action(s,{action:'start',match:52})).toThrow('earlier final')
+    expect(()=>action(s,{action:'start',coinTossWinner:'A',match:52})).toThrow('earlier final')
     for(let n=51;n<=53;n++)finish(s,n)
     expect(s.matches.filter(m=>m.status==='Final')).toHaveLength(53)
     expect(s.matches.slice(36).every(m=>m.games.length===2)).toBe(true)

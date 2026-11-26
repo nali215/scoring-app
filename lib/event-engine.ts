@@ -11,7 +11,7 @@ const common = { requestId: z.string().uuid(), version: z.number().int().nonnega
 const matchFields = { ...common, match: z.number().int().min(1).max(53) }
 const firstPlayers = { server: z.union([z.literal(0),z.literal(1)]).default(0), receiver: z.union([z.literal(0),z.literal(1)]).default(0) }
 export const actionSchema = z.discriminatedUnion('action', [
-  z.object({ ...matchFields, ...firstPlayers, action: z.literal('start'), serving: z.enum(['A', 'B']).default('A') }),
+  z.object({ ...matchFields, ...firstPlayers, action: z.literal('start'), coinTossWinner: z.enum(['A', 'B']), serving: z.enum(['A', 'B']).default('A') }),
   z.object({ ...matchFields, action: z.literal('point'), side: z.enum(['A', 'B']) }),
   z.object({ ...matchFields, action: z.literal('removePoint'), side: z.enum(['A', 'B']) }),
   z.object({ ...matchFields, ...firstPlayers, action: z.literal('nextGame') }),
@@ -94,7 +94,7 @@ export function applyEventAction(state: EventState, action: EventAction, actor: 
     } else if (action.action === 'cancelMatch') {
       requireThat(match.status === 'Live' || match.status === 'Awaiting confirmation', 'Only an unconfirmed match can be cancelled.')
       match.games = []; match.rallies = []; match.starts = []; match.log = []; match.history = [];
-      match.status = 'Scheduled'; delete match.winner
+      match.status = 'Scheduled'; delete match.winner; delete match.coinToss
       detail = 'Cancelled accidental start and cleared unconfirmed scoring; match returned to schedule.'
     } else if (action.action === 'reopen') {
       requireThat(match.status === 'Final', 'Only final matches can be reopened.')
@@ -110,6 +110,8 @@ export function applyEventAction(state: EventState, action: EventAction, actor: 
       const players = playerIds(state, match)
       requireThat(!busy.some(m => playerIds(state, m).some(p => players.includes(p))), 'A player is still playing on another court.')
       if (match.round === 'Final') requireThat(!state.matches.some(m => m.round === 'Final' && m.number < match.number && m.status !== 'Final'), 'Complete the earlier final first. Finals are consecutive.')
+      match.coinToss = { winner: action.coinTossWinner, at: new Date().toISOString() };
+      detail = `Coin toss won by ${state.teams.find(t => t.id === (action.coinTossWinner === 'A' ? match.a.team : match.b.team))!.name}. First serving team: ${action.serving}.`;
       match.games = [createBadmintonGame(action.serving)]; match.rallies = [[]]; match.starts=[{serving:action.serving,server:action.server,receiver:action.receiver}]; match.status = 'Live'
     } else if (action.action === 'point') {
       requireThat(match.status === 'Live', 'This match is not accepting points.')
@@ -160,7 +162,7 @@ export function applyEventAction(state: EventState, action: EventAction, actor: 
     if (action.action === 'resetDemo') {
       for (const m of state.matches) {
         m.games = []; m.rallies = []; m.starts = []; m.log = []; m.history = [];
-        m.status = 'Scheduled'; delete m.winner; m.version++;
+        m.status = 'Scheduled'; delete m.winner; delete m.coinToss; m.version++;
       }
       state.seeds = {}; state.coinTosses = [];
       for (const team of state.teams) team.checkedIn = false
