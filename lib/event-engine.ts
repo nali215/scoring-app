@@ -16,6 +16,8 @@ export const actionSchema = z.discriminatedUnion('action', [
   z.object({ ...matchFields, action: z.literal('removePoint'), side: z.enum(['A', 'B']) }),
   z.object({ ...matchFields, ...firstPlayers, action: z.literal('nextGame') }),
   z.object({ ...matchFields, action: z.literal('submit') }),
+  z.object({ ...matchFields, action: z.literal('cancelMatch') }),
+  z.object({ ...common, action: z.literal('resetDemo'), confirmation: z.literal('RESET DEMO') }),
   z.object({ ...matchFields, action: z.literal('reopen'), reason: z.string().trim().min(5).max(300) }),
   z.object({ ...matchFields, action: z.literal('schedule'), court: z.number().int().min(1).max(3), time }),
   z.object({ ...common, action: z.literal('settings'), settings: z.object({ name: z.string().trim().min(3).max(100), date: z.string().date(), venue: z.string().trim().max(200), note: z.string().trim().max(1000), winBy: z.number().int().min(1).max(2), cap: z.number().int().min(21).max(50), reviewed: z.boolean() }) }),
@@ -72,7 +74,7 @@ export function applyEventAction(state: EventState, action: EventAction, actor: 
   if (!actor.admin) requireThat(state.scorerEnabled[String(actor.court)] && state.courtSessions[String(actor.court)] && state.courtSessions[String(actor.court)] === actor.session, 'Scoring session ended. Sign in again or ask the organizer to enable this account.', 403)
   const requestKey = `${actor.admin ? 'admin' : actor.court}:${action.requestId}`
   if (state.requests.includes(requestKey)) return state
-  const scoreActions = ['start', 'point', 'removePoint', 'nextGame', 'submit']
+  const scoreActions = ['start', 'point', 'removePoint', 'nextGame', 'submit', 'cancelMatch']
   if (!scoreActions.includes(action.action)) requireThat(actor.admin, 'Administrator access required.', 403)
   let detail = ''
   if ('match' in action) {
@@ -89,6 +91,11 @@ export function applyEventAction(state: EventState, action: EventAction, actor: 
       match.court = action.court; match.time = action.time
       const conflicts = scheduleConflicts(state)
       requireThat(!conflicts.length, conflicts[0] ?? '')
+    } else if (action.action === 'cancelMatch') {
+      requireThat(match.status === 'Live' || match.status === 'Awaiting confirmation', 'Only an unconfirmed match can be cancelled.')
+      match.games = []; match.rallies = []; match.starts = []; match.log = []; match.history = [];
+      match.status = 'Scheduled'; delete match.winner
+      detail = 'Cancelled accidental start and cleared unconfirmed scoring; match returned to schedule.'
     } else if (action.action === 'reopen') {
       requireThat(match.status === 'Final', 'Only final matches can be reopened.')
       if (match.round === 'Round robin') requireThat(!state.seeds[match.division], 'Clear this division’s playoff seeds before correcting a round-robin result.')
@@ -150,7 +157,15 @@ export function applyEventAction(state: EventState, action: EventAction, actor: 
     match.version++
   } else {
     requireThat(state.version === action.version, 'Tournament changed. Refresh and try again.', 409)
-    if (action.action === 'settings') {
+    if (action.action === 'resetDemo') {
+      for (const m of state.matches) {
+        m.games = []; m.rallies = []; m.starts = []; m.log = []; m.history = [];
+        m.status = 'Scheduled'; delete m.winner; m.version++;
+      }
+      state.seeds = {}; state.coinTosses = [];
+      for (const team of state.teams) team.checkedIn = false
+      detail = 'Reset demo: cleared all scores, results, serving history, rankings, coin tosses and check-ins. Preserved teams, schedule, settings and scorer access.'
+    } else if (action.action === 'settings') {
       if (state.matches.some(m => m.status !== 'Scheduled')) requireThat(action.settings.winBy === state.settings.winBy && action.settings.cap === state.settings.cap, 'Scoring rules are locked after play begins.')
       state.settings = { ...state.settings, ...action.settings }
     } else if (action.action === 'publish') {
