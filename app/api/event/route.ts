@@ -8,7 +8,7 @@ export const runtime = 'nodejs'
 const response = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { 'Cache-Control': 'no-store' } })
 export async function GET(request: Request) {
   try {
-    const admin = await isAdminAuthed(), state = await readEvent()
+    const admin = await isAdminAuthed(), state = await readEvent(true)
     const court = new URL(request.url).searchParams.get('court') ?? '', scorer=await getScorerAuth()
     const courtAccess = Boolean(scorer && String(scorer.court)===court && state.scorerEnabled[court] && state.courtSessions[court]===scorer.session)
     if (court && !courtAccess && !admin) return response({ error: 'Scoring session ended or this court is not assigned to you. Sign in again.' }, 403)

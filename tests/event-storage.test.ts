@@ -16,7 +16,7 @@ describe('durable local event storage',()=>{
     expect(JSON.parse(await readFile(path.join(dir,'event.json'),'utf8')).settings.venue).toBe('Saved venue')
   })
   it('serializes concurrent score updates and rejects the stale writer',async()=>{
-    await mutateEvent(s=>{s.published=true;return applyEventAction(s,actionSchema.parse({action:'start',coinTossWinner:'A',match:1,version:0,requestId:randomUUID()}),{admin:true})})
+    await mutateEvent(s=>{s.published=true;s.settings.sideOutScoring=false;return applyEventAction(s,actionSchema.parse({action:'start',coinTossWinner:'A',match:1,version:0,requestId:randomUUID()}),{admin:true})})
     const results=await Promise.allSettled(['A','B'].map(side=>mutateEvent(s=>applyEventAction(s,actionSchema.parse({action:'point',match:1,side,version:1,requestId:randomUUID()}),{admin:true}))))
     expect(results.filter(r=>r.status==='fulfilled')).toHaveLength(1)
     const game=(await readEvent()).matches[0].games[0]

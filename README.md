@@ -1,111 +1,55 @@
-# URC Southwest Badminton 2026
+# URC Games 2026 Pickleball
 
-A phone/iPad scoring app and a dedicated three-court monitor display for November 26, 2026.
+Phone/iPad scoring and a three-court monitor for November 28–29, 2026. The host's adult and junior posters supply the fixtures. The organizer confirmed the junior final at **1:30 PM Sunday**, best-of-three semifinals/finals, win by two with no cap, and traditional scoring by default.
 
-## Source and event setup
+## Event and rules
 
-The event starts as an unpublished draft: 21 teams, 36 opening matches, 17 knockouts, three courts. data/urc-2026.json follows the workbook's **MASTER SCHEDULE**, including match 39 on Court 1, match 40 on Court 2, and match 41 on Court 3. Posters provide visual direction only. Source team numbers are stable IDs, not playoff rankings. Registration contact details are not imported. Organizer correction: Amik/Faiz is now Amik/Alim (team men-7); all four source fixtures retain their original assignments.
+23 doubles teams: 18 adult (17+) and five junior (11–13). There are 37 opening matches and 18 playoffs, 55 total. Each adult team plays three opening matches; each junior team plays all four opponents. Adult top 16 and junior top four advance. Adult round of 16 and quarterfinals use one game to 15. Opening matches use one game to 11; semifinals and finals are best of three to 11.
 
-Enter the venue, review player identities, and confirm the rules before publishing. The source has one game to 21 for opening rounds and best of three to 21 for knockouts. Win-by-two and a 30-point cap are proposed editable defaults. Suggested rankings use wins, point difference, then points scored; an organizer must resolve remaining ties and confirm seeds.
+Admin > Setup selects traditional or rally scoring. This setting applies to unstarted matches; a started match keeps its scoring mode. Traditional scoring opens at 0–0–2: only the serving side scores, with first/second servers and side-outs tracked automatically. Tap **+ Rally won** for the team that won the rally, including rallies that change service without awarding a point. Tap **− Correct** to remove that side's last current-game rally and replay service/score. For a wrong-team entry, correct it before recording the right winner. Rally mode awards a point on every rally and uses a single server per service turn. Source: [USA Pickleball official rules](https://usapickleball.org/docs/rules/USAP-Official-Rulebook.pdf).
 
-Player identity keys link the same player across divisions to prevent concurrent matches. Review short-name aliases before play. Sohil.M and Sohil.P remain distinct.
+The scorer selects the coin toss winner, first serving team, first server and receiver at match start. Review scores before starting another game or confirming the result. Match details preserve rally and correction history. Service tracking reflects recorded rallies; it cannot detect an on-court positioning error.
 
-## Run locally
+## Game day
+
+- Viewers need no login: `/` has schedule, standings and brackets; `/matches/1` shows match details.
+- `/scorekeeper` signs in court1, court2 or court3. Passwords are server environment values, with no fallback passwords in source.
+- Each scorer may select **any ready unplayed match**, regardless of its scheduled court. Starting it assigns it to that scorer's court. An occupied court or player already playing is blocked. Signing in on a new device transfers that court's session.
+- Cancel an accidental start before scoring, or ask Admin to reset/reopen a match with a reason. Demo reset clears all scoring; download a backup first.
+- Admin > Rankings confirms each division's full seed order. To open playoffs before round robin ends, select the override and enter a reason. Existing results remain intact. Later results do not change confirmed seeds. Started playoff matches protect the bracket from incompatible reseeding.
+- `/display` fits all three courts together on a landscape monitor, including 1024×768. Court 3 is available for flexible assignment even though the posters plan Courts 1–2.
+
+**Schedule conflict:** Sunday's junior final and adult semifinal are both planned on Court 1 at 1:30 PM. The confirmed junior time is preserved. The host should move one match to another free court or delay it. Planned time clashes are advisory; actual simultaneous court/player conflicts are enforced at match start.
+
+Player identity keys prevent simultaneous play across teams. The posters contain several people called Arif and Abid; ambiguous duplicates have separate team-specific identity keys because some play simultaneously. Admin should review these identities before play. Display names can be corrected without changing scores; identity keys lock after a team's first match.
+
+## Run and verify
 
 Requires Node.js 22.9+ and npm.
 
 ```sh
-npm install
+npm ci
 npm run setup:local
 npm run dev
-```
-
-Setup creates a private ignored .env.local and prints a generated organizer password. It never overwrites existing configuration. If already configured, ADMIN_PASSWORD is in that file.
-
-Three scorer accounts are configured by local setup as requested:
-- court1 / Court1!
-- court2 / Court2!
-- court3 / Court3!
-
-Passwords are server environment values, never client-side checks. Viewers need no account. Each scorer account is restricted to its own court. Signing in transfers that court's session to the new device and invalidates the old session. Organizers can assign a scorer name, disable a court account, or end an active session.
-
-Routes:
-- / — view-only schedule, court status, standings and knockouts
-- /admin — organizer dashboard
-- /scorekeeper — scorer sign-in
-- /display — full-screen, three-court monitor board
-- /matches/1 — match detail and rally history (match numbers 1–53)
-
-Local storage uses .data/event.json with a process-shared lock and atomic replacement. It survives restarts. Use one host with persistent disk; separate hosts must share PostgreSQL, not separate files.
-
-## Hosting
-
-Set DATABASE_URL, ADMIN_PASSWORD, AUTH_SECRET (32+ random characters), COURT1_PASSWORD, COURT2_PASSWORD, and COURT3_PASSWORD. The requested scorer passwords must be configured explicitly; the server has no fallback passwords.
-
-```sh
-npm run event:db
-npm run build
-```
-
-event:db creates EventDocument if missing without resetting data. It loads .env.local if present and otherwise uses normal hosting environment variables. Hosted scoring uses PostgreSQL transactions and row locks. Vercel refuses local-file fallback. Database connectivity and multi-device operation must be verified on the actual hosting environment before event day. This change does not deploy the app.
-
-Local production-mode preview is supported with ALLOW_LOCAL_STORAGE=true:
-```sh
-npm run build
-npm start
-```
-
-## Game-day workflow
-
-1. Organizer reviews Setup, enters venue, checks in teams, and assigns scorer names.
-2. Publish the reviewed event. Players use the public schedule; scorers sign in with their assigned court account.
-3. Select an eligible match. Choose the first serving team, first server, and first receiver.
-4. Tap + for the rally-winning team. The app updates the score, server, receiver, and service court automatically.
-5. For a wrong-team entry, tap − on that team, then + on the correct team. − removes that team's most recent current-game point and recalculates service. Scores cannot go below zero.
-6. At game completion, review the score. For another game, choose its first server and receiver and tap Start game. At match completion, confirm the final result.
-7. Viewers can open any match to see the first serve, every recorded rally, service changes, and corrections. Earlier log entries are retained as originally recorded.
-8. After round robin, finalize each division's complete ranking. Men's top eight advance; rank nine is eliminated. Confirmed winners advance automatically.
-9. Finals run in master-schedule order: Legends, Men's, Mixed, consecutively on Court 1.
-
-Doubles service tracking follows the service-court/order model in BWF Laws 11.1–11.4: even scores serve from the right, odd from the left; a serving-side win swaps that pair's service courts, while a receiving-side win transfers service without swapping either pair. This is a guide to the recorded match, not detection of on-court service errors. Source: https://system.bwfbadminton.com/documents/folder_1_81/Statutes/CHAPTER-4---RULES-OF-THE-GAME/Section%204.1-%20Laws%20of%20Badminton%20-%2019052018A.pdf
-
-## Monitor and mobile use
-
-/display uses the full viewport and always shows three courts together on landscape monitors. Scores, teams, and server are large; dashboard navigation and setup controls are omitted. Tested target sizes include 1024×768 and 1280×720. Use browser full-screen mode for the largest available area. Before play, each court shows its next scheduled match.
-
-Phone schedules use cards rather than sideways tables. Scorer controls are large touch targets. The app polls every three seconds. On a network failure, scoring is disabled until the saved state is refreshed. It does not queue offline points.
-
-## Corrections and safeguards
-
-Only organizers can reopen confirmed results, with a reason. Then use the scorer's −/+ controls on the current game and reconfirm. A correction is rejected if it would imply rallies after a game should already have ended; remove the most recent winning point first. Review each game before starting the next one, because normal score corrections target the current game.
-
-Started downstream playoff matches protect the bracket. Correct downstream results first. Round-robin result corrections require clearing seeds; clearing seeds is blocked after knockouts start. Reopening an unconsumed knockout result clears its downstream winner assignment.
-
-Schedule edits are allowed only before play starts. Overlap checks use 20-minute opening matches and 40-minute knockouts. TBA times remain TBA. Shared-player and court conflicts are checked again when starting a match.
-
-Stale score updates are rejected by match version, and request IDs deduplicate repeats. API authorization is enforced server-side. Organizer sessions expire; scorer sessions expire and are revocable. Retired prototype roster/live-score endpoints return 410.
-
-## Backup and recovery
-
-Download Backup from Admin regularly. It contains the complete event and audit log but clears device sessions. Credentials remain in server configuration, not backups.
-
-To restore locally, stop all app processes, preserve the current .data/event.json separately, validate the backup's schema and event identity, and copy the backup to .data/event.json. Restart and have scorers sign in again. For hosting, use database backups and a controlled restore.
-
-A killed local process can leave .data/event.lock. Stop all app processes before removing only that stale lock directory. Preserve event.json. Never remove an active writer's lock.
-
-## Checks and scope
-
-```sh
 npm test
 npm run lint
-npm run typecheck
 npm run build
 ```
 
-Coverage includes source counts/assignments, all 53 matches, seeding, service rotation, wrong-team corrections, authorization, session transfer, persistence, concurrency, and revocation.
+Setup creates an ignored private `.env.local`, generates an admin password, and configures the requested court passwords. Existing configuration is preserved. Never commit passwords or database URLs.
 
-This workflow is scoped to the supplied URC event. It does not implement general tournament creation, player registration/payments, walkover adjudication, or offline score syncing.
+Local storage uses `.data/event.json`, a shared lock and atomic file replacement. On crash recovery, stop all app processes before removing a stale `.data/event.lock`; preserve event.json. Separate hosts must share PostgreSQL.
 
-## Host correction during play — November 26
+For Vercel, configure DATABASE_URL, ADMIN_PASSWORD, AUTH_SECRET (32+ random characters), and COURT1_PASSWORD through COURT3_PASSWORD. Quote passwords containing `#` in local env files. Run `npm run event:db` to create the EventDocument table if missing. Production refuses local-file fallback. The linked GitHub main branch deploys to the existing Vercel project.
 
-The live PostgreSQL event has three Legends teams: Altuali/Karim, Nash/Amik, and Rizwan/Anif. The scored Naushad/Rafiq entry (legends-3) was corrected to Nash/Amik, retaining its team ID and all scores. The unused Nasir/Nash entry was removed. Round-robin fixtures 11, 13, 20, 21, 28, 33 now cover each pairing twice; the top two play final 51 directly. Unstarted semifinals 45 and 48 were removed. All played matches were verified unchanged for games, rallies, starts, snapshots, status, winners, tosses and team slots. Serving-name labels were corrected. The live database and its backup contain this event correction; the original workbook seed remains a source snapshot, not a restore of current tournament state.
+PostgreSQL writes lock the event row in a transaction. Match versions reject stale updates, request IDs prevent duplicate taps, and server authorization controls all mutations. Views poll every 10 seconds; scorers every three seconds, pausing hidden tabs. Offline scoring is disabled until the saved state can be refreshed. Dashboard queries omit bulky histories inside PostgreSQL; details load one match.
+
+## Badminton archive and backups
+
+Pickleball uses a separate EventDocument key, `urc-pickleball-2026`. The completed badminton event remains under `urc-2026`; switching the active app does not rewrite its results. Legacy badminton fixtures and regression tests remain in source.
+
+Before conversion, a full custom-format PostgreSQL dump and a readable JSON export of every public table were saved locally with SHA-256 files. The badminton event contains 20 teams and 51 confirmed matches. Preserve these private backups outside Git.
+
+For routine pickleball backup, use Admin's Download backup. This includes event results/history and clears device sessions; passwords stay in environment configuration. For a database restore, first back up the current database and restore into a separate database, validate both event keys and counts, then deliberately switch the database connection. Do not restore the old full dump over live pickleball results. The custom dump is inspectable with `pg_restore --list`; restoring schema/data needs a compatible PostgreSQL server and credentials. The readable export has tables containing `{row: ...}` entries, including EventDocument id/data.
+
+This app does not implement registration, payments, automatic walkovers, or offline synchronization.

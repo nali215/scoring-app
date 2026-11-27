@@ -1,23 +1,23 @@
 import type { GameSnapshot } from './scoring/types'
 import type { ServiceStart } from './doubles-service'
 
-export type Division = 'men' | 'mixed' | 'legends'
-export const divisionNames: Record<Division, string> = { men: "Men's Doubles", mixed: 'Mixed Doubles', legends: 'Legends 45+ Doubles' }
+export type Division = 'men' | 'mixed' | 'legends' | 'adult' | 'junior'
+export const divisionNames: Record<Division, string> = { men: "Men's Doubles", mixed: 'Mixed Doubles', legends: 'Legends 45+ Doubles', adult: 'Ages 17+ Doubles', junior: 'Ages 11–13 Doubles' }
 export const divisions: Division[] = ['men', 'mixed', 'legends']
-export type Team = { id: string; division: Division; name: string; players: string[]; checkedIn: boolean }
+export type Team = { id: string; division: Division; name: string; players: string[]; checkedIn: boolean; displayPlayers?: string[] }
 export type Slot = { team?: string; seed?: number; winner?: number }
 export type Match = {
-  number: number; division: Division; round: 'Round robin' | 'Quarterfinal' | 'Semifinal' | 'Final'; court: number; time: string;
+  number: number; division: Division; round: 'Round robin' | 'Round of 16' | 'Quarterfinal' | 'Semifinal' | 'Final'; court: number; time: string; date?: string; sideOutScoring?: boolean; format?: { pointsToWin: number; bestOf: 1 | 3 };
   a: Slot; b: Slot; games: GameSnapshot[]; status: 'Scheduled' | 'Live' | 'Awaiting confirmation' | 'Final';
   coinToss?: { winner: 'A' | 'B'; at: string };
   winner?: string; version: number; history: { games: GameSnapshot[]; status: Match['status'] }[];
   rallies: ('A' | 'B')[][];
   starts: ServiceStart[];
-  log: { at: string; action: 'point' | 'removePoint' | 'startGame'; game: number; side?: 'A'|'B'; server: string; receiver: string; score: string; nextServer: string; serviceCourt: string }[];
+  log: { at: string; action: 'point' | 'removePoint' | 'startGame' | 'removeRally'; game: number; side?: 'A'|'B'; server: string; receiver: string; score: string; nextServer: string; serviceCourt: string }[];
 }
 export type EventState = {
   schema: 1; version: number; updatedAt: string; published: boolean;
-  settings: { name: string; date: string; venue: string; timezone: string; note: string; winBy: number; cap: number; reviewed: boolean };
+  settings: { name: string; date: string; venue: string; timezone: string; note: string; winBy: number; cap: number; reviewed: boolean; sport?: 'badminton' | 'pickleball'; sideOutScoring?: boolean; endDate?: string; courtCount?: number };
   teams: Team[]; matches: Match[]; seeds: Partial<Record<Division, string[]>>;
   coinTosses?: { id: string; division: Division; teams: string[]; winner: string; note: string; at: string; actor: string }[];
   courtSessions: Record<string, string>;
@@ -41,7 +41,7 @@ export function matchScore(m: Match) {
 }
 export function playerName(state: Pick<EventState,'teams'>, match: Match, side:'A'|'B', index:number) {
   const team=state.teams.find(t=>t.id===(side==='A'?match.a.team:match.b.team))
-  return (team?.players[index]??`Player ${index+1}`).replace(/\b[a-z]/g,c=>c.toUpperCase())
+  return (team?.displayPlayers?.[index] ?? team?.players[index]??`Player ${index+1}`).replace(/\b[a-z]/g,c=>c.toUpperCase())
 }
 
 export function standings(state: Pick<EventState, 'teams' | 'matches'>, division: Division) {
@@ -58,3 +58,9 @@ export function standings(state: Pick<EventState, 'teams' | 'matches'>, division
   }
   return rows.sort((a, b) => b.wins - a.wins || b.diff - a.diff || b.for - a.for || a.team.name.localeCompare(b.team.name))
 }
+
+export function eventDivisions(state: Pick<EventState,'teams'>): Division[] { return [...new Set(state.teams.map(t=>t.division))] }
+export function eventCourts(state: Pick<EventState,'settings'>) { return Array.from({length:state.settings.courtCount??3},(_,i)=>i+1) }
+export function matchDate(state: Pick<EventState,'settings'>, match: Match) { return match.date??state.settings.date }
+export function formatDate(date: string) { return new Date(`${date}T12:00:00`).toLocaleDateString('en-US',{month:'short',day:'numeric'}) }
+export function formatDescription(match: Match) { const f=match.format??{pointsToWin:21,bestOf:match.round==='Round robin'?1:3};return `${f.bestOf===1?'1 game':'Best of 3'} to ${f.pointsToWin}` }

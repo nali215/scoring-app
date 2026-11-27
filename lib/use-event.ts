@@ -28,10 +28,10 @@ export function useEvent(court?: number) {
   }, [endpoint, accept])
   useEffect(() => {
     let stopped = false, timer: ReturnType<typeof setTimeout>
-    const poll = async () => { await refresh(); if (!stopped) timer = setTimeout(poll, 3000) }
+    const poll = async () => { if(!document.hidden) await refresh(); if (!stopped) timer = setTimeout(poll, court?3000:10000) }
     void poll()
     return () => { stopped = true; clearTimeout(timer) }
-  }, [refresh])
+  }, [refresh, court])
   const send = useCallback(async (action: object): Promise<EventView | null> => {
     if (busy.current) return null
     busy.current = true; setPending(true); setError('')
