@@ -1,6 +1,6 @@
 # URC Games 2026 Pickleball
 
-Phone/iPad scoring and a three-court monitor for November 28–29, 2026. The host's adult and junior posters supply the fixtures. The organizer confirmed the junior final at **1:30 PM Sunday**, best-of-three semifinals/finals, win by two with no cap, and traditional scoring by default.
+Phone/iPad scoring and an adaptive court monitor for November 28–29, 2026. The host's adult and junior posters supply the fixtures. The organizer confirmed the junior final at **1:30 PM Sunday**, best-of-three semifinals/finals, win by two with no cap, and traditional scoring by default.
 
 ## Event and rules
 
@@ -17,7 +17,7 @@ The scorer selects the coin toss winner, first serving team, first server and re
 - Each scorer may select **any ready unplayed match**, regardless of its scheduled court. Starting it assigns it to that scorer's court. An occupied court or player already playing is blocked. Signing in on a new device transfers that court's session.
 - Cancel an accidental start before scoring, or ask Admin to reset/reopen a match with a reason. Demo reset clears all scoring; download a backup first.
 - Admin > Rankings confirms each division's full seed order. To open playoffs before round robin ends, select the override and enter a reason. Existing results remain intact. Later results do not change confirmed seeds. Started playoff matches protect the bracket from incompatible reseeding.
-- `/display` fits all three courts together on a landscape monitor, including 1024×768. Court 3 is available for flexible assignment even though the posters plan Courts 1–2.
+- `/display` fits all three courts together on a landscape monitor, including 1024×768. It shows only configured courts and resizes when courts are added. The event starts with Courts 1–2. Admin > Scorers can add extra physical courts (up to eight) with a chosen username and password, or update an existing court’s credentials. Adding a court updates scoring, scheduling, filters and the monitor. Usernames are unique and case-insensitive; passwords need at least six characters. Passwords are hashed with salted scrypt in PostgreSQL and never returned by dashboard APIs. Changing credentials ends that court’s current session. The original Court 1–2 credentials remain in server environment configuration until overridden in Admin.
 
 **Schedule conflict:** Sunday's junior final and adult semifinal are both planned on Court 1 at 1:30 PM. The confirmed junior time is preserved. The host should move one match to another free court or delay it. Planned time clashes are advisory; actual simultaneous court/player conflicts are enforced at match start.
 
@@ -40,7 +40,7 @@ Setup creates an ignored private `.env.local`, generates an admin password, and 
 
 Local storage uses `.data/event.json`, a shared lock and atomic file replacement. On crash recovery, stop all app processes before removing a stale `.data/event.lock`; preserve event.json. Separate hosts must share PostgreSQL.
 
-For Vercel, configure DATABASE_URL, ADMIN_PASSWORD, AUTH_SECRET (32+ random characters), and COURT1_PASSWORD through COURT3_PASSWORD. Quote passwords containing `#` in local env files. Run `npm run event:db` to create the EventDocument table if missing. Production refuses local-file fallback. The linked GitHub main branch deploys to the existing Vercel project.
+For Vercel, configure DATABASE_URL, ADMIN_PASSWORD, AUTH_SECRET (32+ random characters), and COURT1_PASSWORD and COURT2_PASSWORD. Quote passwords containing `#` in local env files. Run `npm run event:db` to create the EventDocument table if missing. Production refuses local-file fallback. The linked GitHub main branch deploys to the existing Vercel project.
 
 PostgreSQL writes lock the event row in a transaction. Match versions reject stale updates, request IDs prevent duplicate taps, and server authorization controls all mutations. Views poll every 10 seconds; scorers every three seconds, pausing hidden tabs. Offline scoring is disabled until the saved state can be refreshed. Dashboard queries omit bulky histories inside PostgreSQL; details load one match.
 
@@ -50,6 +50,6 @@ Pickleball uses a separate EventDocument key, `urc-pickleball-2026`. The complet
 
 Before conversion, a full custom-format PostgreSQL dump and a readable JSON export of every public table were saved locally with SHA-256 files. The badminton event contains 20 teams and 51 confirmed matches. Preserve these private backups outside Git.
 
-For routine pickleball backup, use Admin's Download backup. This includes event results/history and clears device sessions; passwords stay in environment configuration. For a database restore, first back up the current database and restore into a separate database, validate both event keys and counts, then deliberately switch the database connection. Do not restore the old full dump over live pickleball results. The custom dump is inspectable with `pg_restore --list`; restoring schema/data needs a compatible PostgreSQL server and credentials. The readable export has tables containing `{row: ...}` entries, including EventDocument id/data.
+For routine pickleball backup, use Admin's Download backup. This includes event results/history and clears device sessions. Custom court password hashes are included in private backups; keep them secure. Admin credentials and fallback court passwords stay in environment configuration. For a database restore, first back up the current database and restore into a separate database, validate both event keys and counts, then deliberately switch the database connection. Do not restore the old full dump over live pickleball results. The custom dump is inspectable with `pg_restore --list`; restoring schema/data needs a compatible PostgreSQL server and credentials. The readable export has tables containing `{row: ...}` entries, including EventDocument id/data.
 
 This app does not implement registration, payments, automatic walkovers, or offline synchronization.

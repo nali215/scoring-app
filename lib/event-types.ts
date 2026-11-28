@@ -1,6 +1,7 @@
 import type { GameSnapshot } from './scoring/types'
 import type { ServiceStart } from './doubles-service'
 
+export const MAX_COURTS = 8
 export type Division = 'men' | 'mixed' | 'legends' | 'adult' | 'junior'
 export const divisionNames: Record<Division, string> = { men: "Men's Doubles", mixed: 'Mixed Doubles', legends: 'Legends 45+ Doubles', adult: 'Ages 17+ Doubles', junior: 'Ages 11–13 Doubles' }
 export const divisions: Division[] = ['men', 'mixed', 'legends']
@@ -20,13 +21,14 @@ export type EventState = {
   settings: { name: string; date: string; venue: string; timezone: string; note: string; winBy: number; cap: number; reviewed: boolean; sport?: 'badminton' | 'pickleball'; sideOutScoring?: boolean; endDate?: string; courtCount?: number };
   teams: Team[]; matches: Match[]; seeds: Partial<Record<Division, string[]>>;
   coinTosses?: { id: string; division: Division; teams: string[]; winner: string; note: string; at: string; actor: string }[];
+  scorerAccounts?: Record<string, { username: string; passwordHash: string }>;
   courtSessions: Record<string, string>;
   scorerNames: Record<string, string>;
   scorerEnabled: Record<string, boolean>;
   audit: { at: string; actor: string; action: string; match?: number; detail: string }[];
   requests: string[];
 }
-export type EventView = Omit<EventState, 'courtSessions' | 'requests' | 'audit'> & { audit?: EventState['audit']; activeCourts?: number[] }
+export type EventView = Omit<EventState, 'courtSessions' | 'requests' | 'audit' | 'scorerAccounts'> & { audit?: EventState['audit']; activeCourts?: number[]; scorerUsernames?: Record<string, string> }
 
 export function teamName(state: Pick<EventState, 'teams'>, slot: Slot): string {
   return state.teams.find(t => t.id === slot.team)?.name ?? (slot.seed ? `Seed #${slot.seed}` : slot.winner ? `Winner #${slot.winner}` : 'To be assigned')

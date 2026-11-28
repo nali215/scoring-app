@@ -1,17 +1,20 @@
+import { hashScorerPassword } from './scorer-credentials'
 import { z } from 'zod'
 import { awardBadmintonRally, createBadmintonGame } from './scoring/badminton'
 import { matchWinner } from './scoring/validation'
 import type { ScoringRules } from './scoring/types'
-import { type EventState, type Match, type Division, playerName } from './event-types'
+import { type EventState, type Match, type Division, playerName, eventCourts, MAX_COURTS } from './event-types'
 import { serviceFor, pickleballSnapshot, nextServingTeam } from './event-service'
 
 const division = z.enum(['men', 'mixed', 'legends','adult','junior'])
 const time = z.string().regex(/^(TBA|([01]\d|2[0-3]):[0-5]\d)$/)
 const common = { requestId: z.string().uuid(), version: z.number().int().nonnegative() }
 const matchFields = { ...common, match: z.number().int().min(1).max(999) }
+const username = z.string().trim().toLowerCase().min(3).max(40).regex(/^[a-z0-9][a-z0-9_.-]*$/, 'Use letters, numbers, dots, underscores or hyphens for the username.')
+const password = z.string().min(6).max(128)
 const firstPlayers = { server: z.union([z.literal(0),z.literal(1)]).default(0), receiver: z.union([z.literal(0),z.literal(1)]).default(0) }
 export const actionSchema = z.discriminatedUnion('action', [
-  z.object({ ...matchFields, ...firstPlayers, action: z.literal('start'), coinTossWinner: z.enum(['A', 'B']), court: z.number().int().min(1).max(3).optional(), serving: z.enum(['A', 'B']).default('A') }),
+  z.object({ ...matchFields, ...firstPlayers, action: z.literal('start'), coinTossWinner: z.enum(['A', 'B']), court: z.number().int().min(1).max(MAX_COURTS).optional(), serving: z.enum(['A', 'B']).default('A') }),
   z.object({ ...matchFields, action: z.literal('point'), side: z.enum(['A', 'B']) }),
   z.object({ ...matchFields, action: z.literal('removePoint'), side: z.enum(['A', 'B']) }),
   z.object({ ...matchFields, ...firstPlayers, action: z.literal('nextGame') }),
@@ -19,15 +22,17 @@ export const actionSchema = z.discriminatedUnion('action', [
   z.object({ ...matchFields, action: z.literal('cancelMatch') }),
   z.object({ ...common, action: z.literal('resetDemo'), confirmation: z.literal('RESET DEMO') }),
   z.object({ ...matchFields, action: z.literal('reopen'), reason: z.string().trim().min(5).max(300) }),
-  z.object({ ...matchFields, action: z.literal('schedule'), date: z.string().date().optional(), court: z.number().int().min(1).max(3), time }),
+  z.object({ ...matchFields, action: z.literal('schedule'), date: z.string().date().optional(), court: z.number().int().min(1).max(MAX_COURTS), time }),
   z.object({ ...common, action: z.literal('settings'), settings: z.object({ sideOutScoring: z.boolean().optional(), name: z.string().trim().min(3).max(100), date: z.string().date(), venue: z.string().trim().max(200), note: z.string().trim().max(1000), winBy: z.number().int().min(1).max(2), cap: z.number().int().min(0).max(50), reviewed: z.boolean() }) }),
   z.object({ ...common, action: z.literal('publish'), published: z.boolean() }),
   z.object({ ...common, action: z.literal('team'), id: z.string().max(40), name: z.string().trim().min(3).max(100), players: z.array(z.string().trim().min(1).max(80)).length(2), checkedIn: z.boolean() }),
   z.object({ ...common, action: z.literal('seed'), division, overrideReason: z.string().trim().min(5).max(300).optional(), order: z.array(z.string().max(40)).min(3).max(64) }),
   z.object({ ...common, action: z.literal('clearSeeds'), division }),
   z.object({ ...common, action: z.literal('coinToss'), division, teams: z.array(z.string().max(40)).min(2).max(64), winner: z.string().max(40), note: z.string().trim().max(300).default('') }),
-  z.object({ ...common, action: z.literal('scorer'), court: z.number().int().min(1).max(3), name: z.string().trim().min(1).max(80), enabled: z.boolean() }),
-  z.object({ ...common, action: z.literal('releaseScorer'), court: z.number().int().min(1).max(3) })
+  z.object({ ...common, action: z.literal('scorer'), court: z.number().int().min(1).max(MAX_COURTS), name: z.string().trim().min(1).max(80), enabled: z.boolean() }),
+  z.object({ ...common, action: z.literal('addCourt'), username, password }),
+  z.object({ ...common, action: z.literal('scorerAccount'), court: z.number().int().min(1).max(MAX_COURTS), username, password: password.optional() }),
+  z.object({ ...common, action: z.literal('releaseScorer'), court: z.number().int().min(1).max(MAX_COURTS) })
 ])
 export type EventAction = z.infer<typeof actionSchema>
 export type Actor = { admin: true } | { admin: false; court: number; session: string }
@@ -72,7 +77,7 @@ function unstartedKnockouts(state: EventState, division: Division) {
 
 // Runs inside the storage transaction. No client-supplied status, score, winner, or court authority is trusted.
 export function applyEventAction(state: EventState, action: EventAction, actor: Actor): EventState {
-  if (!actor.admin) requireThat(state.scorerEnabled[String(actor.court)] && state.courtSessions[String(actor.court)] && state.courtSessions[String(actor.court)] === actor.session, 'Scoring session ended. Sign in again or ask the organizer to enable this account.', 403)
+  if (!actor.admin) requireThat(eventCourts(state).includes(actor.court) && state.scorerEnabled[String(actor.court)] && state.courtSessions[String(actor.court)] && state.courtSessions[String(actor.court)] === actor.session, 'Scoring session ended. Sign in again or ask the organizer to enable this account.', 403)
   const requestKey = `${actor.admin ? 'admin' : actor.court}:${action.requestId}`
   if (state.requests.includes(requestKey)) return state
   const scoreActions = ['start', 'point', 'removePoint', 'nextGame', 'submit', 'cancelMatch']
@@ -89,6 +94,7 @@ export function applyEventAction(state: EventState, action: EventAction, actor: 
     if (action.action === 'schedule') {
       requireThat(match.status === 'Scheduled', 'Only unstarted matches can be rescheduled.')
       detail = `${match.time}, Court ${match.court} → ${action.time}, Court ${action.court}`
+      requireThat(eventCourts(state).includes(action.court), 'Add this court in Scorers before assigning matches.')
       match.court = action.court; match.time = action.time; if(action.date) match.date=action.date
       const conflicts = scheduleConflicts(state)
       if(state.settings.sport!=='pickleball')requireThat(!conflicts.length, conflicts[0] ?? '')
@@ -108,6 +114,7 @@ export function applyEventAction(state: EventState, action: EventAction, actor: 
       requireThat(match.a.team && match.b.team, 'Finalize rankings or complete the preceding matches first.')
       const targetCourt = actor.admin ? (action.court ?? match.court) : actor.court
       requireThat(actor.admin || action.court === undefined || action.court === actor.court, 'Start matches on your signed-in court.', 403)
+      requireThat(eventCourts(state).includes(targetCourt), 'This court is not configured for the tournament.')
       const previousCourt = match.court
       const busy = state.matches.filter(m => m.status === 'Live' || m.status === 'Awaiting confirmation')
       requireThat(!busy.some(m => m.court === targetCourt), 'Another match is still active on this court.')
@@ -216,12 +223,30 @@ export function applyEventAction(state: EventState, action: EventAction, actor: 
     } else if (action.action === 'clearSeeds') {
       unstartedKnockouts(state, action.division)
       delete state.seeds[action.division]
+    } else if (action.action === 'addCourt' || action.action === 'scorerAccount') {
+      const courts = eventCourts(state)
+      const court = action.action === 'addCourt' ? courts.length + 1 : action.court
+      requireThat(court <= MAX_COURTS && (action.action === 'addCourt' || courts.includes(court)), 'Court not available.')
+      requireThat(!courts.some(n => n !== court && (state.scorerAccounts?.[String(n)]?.username ?? `court${n}`) === action.username), 'This username is already assigned to another court.')
+      const previous = state.scorerAccounts?.[String(court)]
+      requireThat(action.password || previous, 'Set a password when first configuring this account.')
+      state.scorerAccounts ??= {}
+      state.scorerAccounts[String(court)] = { username: action.username, passwordHash: action.password ? hashScorerPassword(action.password) : previous!.passwordHash }
+      delete state.courtSessions[String(court)]
+      if (action.action === 'addCourt') {
+        state.settings.courtCount = court
+        state.scorerNames[String(court)] = `Court ${court} scorer`
+        state.scorerEnabled[String(court)] = true
+      }
+      detail = `Court ${court}: ${action.action === 'addCourt' ? 'added' : 'credentials updated'}; username ${action.username}. Previous session ended.`
     } else if (action.action === 'scorer') {
+      requireThat(eventCourts(state).includes(action.court), 'Court not configured.')
       state.scorerNames[String(action.court)] = action.name
       state.scorerEnabled[String(action.court)] = action.enabled
       if (!action.enabled) delete state.courtSessions[String(action.court)]
       detail = `Court ${action.court}: ${action.name}, ${action.enabled ? 'enabled' : 'disabled'}`
     } else if (action.action === 'releaseScorer') {
+      requireThat(eventCourts(state).includes(action.court), 'Court not configured.')
       delete state.courtSessions[String(action.court)]
       detail = `Ended Court ${action.court} scoring session`
     }
@@ -234,7 +259,7 @@ export function applyEventAction(state: EventState, action: EventAction, actor: 
 }
 
 export function publicView(state: EventState, admin = false) {
-  const { courtSessions, requests: _requests, audit, ...view } = state
+  const { courtSessions, requests: _requests, audit, scorerAccounts: _accounts, ...view } = state
   const slim = { ...view, matches: view.matches.map(m => ({ ...m, history: [], log: [] })) }
-  return admin ? { ...slim, activeCourts: Object.keys(courtSessions).map(Number), audit: audit.slice(-100) } : slim
+  return admin ? { ...slim, scorerUsernames: Object.fromEntries(eventCourts(state).map(n => [String(n), state.scorerAccounts?.[String(n)]?.username ?? `court${n}`])), activeCourts: Object.keys(courtSessions).map(Number), audit: audit.slice(-100) } : slim
 }

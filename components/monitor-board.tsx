@@ -1,12 +1,15 @@
 'use client'
+import type {CSSProperties} from 'react'
 import {useEvent} from '@/lib/use-event'
 import {teamName,formatTime,playerName,matchScore,eventCourts,formatDate,matchDate,formatDescription} from '@/lib/event-types'
 import {serviceFor} from '@/lib/event-service'
 export function MonitorBoard(){
  const {state,error,loading,lastSync}=useEvent()
  if(!state)return <main className="monitor-empty"><h1>URC Games Pickleball</h1><p>{loading?'Loading courts…':error||'The schedule will appear when the organizer publishes the event.'}</p></main>
- return <main className="monitor-board"><header className="monitor-header"><div><span>URC SOUTHWEST</span><h1>Pickleball · Court scores</h1></div><div><strong>{state.matches.filter(m=>m.status==='Final').length} / {state.matches.length}</strong><span>matches complete</span></div></header>
- <section className="monitor-courts">{eventCourts(state).map(court=>{
+ const courts=eventCourts(state),columns=courts.length<=3?courts.length:courts.length===4?2:courts.length<=6?3:4
+ const gridStyle={'--court-count':courts.length,'--court-columns':columns,'--court-rows':Math.ceil(courts.length/columns)} as CSSProperties
+ return <main className={`monitor-board ${courts.length>3?'monitor-many':''}`} style={gridStyle}><header className="monitor-header"><div><span>URC SOUTHWEST</span><h1>Pickleball · Court scores</h1></div><div><strong>{state.matches.filter(m=>m.status==='Final').length} / {state.matches.length}</strong><span>matches complete</span></div></header>
+ <section className="monitor-courts">{courts.map(court=>{
  const all=state.matches.filter(m=>m.court===court),active=all.find(m=>m.status==='Live'||m.status==='Awaiting confirmation'),next=all.find(m=>m.status==='Scheduled'),match=active??next??all.at(-1)
  if(!match)return <article key={court} className="monitor-court"><div className="monitor-court-title"><h2>Court {court}</h2></div><div className="monitor-service"><strong>Available court</strong><span>Select any ready match</span></div></article>
  const g=match.games.at(-1)

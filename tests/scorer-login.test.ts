@@ -27,3 +27,19 @@ describe('court username/password sessions',()=>{
   expect((await login()).status).toBe(403)
  })
 })
+
+it('starts with two courts and rejects the old third court account',async()=>{
+ vi.stubEnv('COURT3_PASSWORD','Court3#')
+ expect((await readEvent()).settings.courtCount).toBe(2)
+ expect((await login('court3','Court3#')).status).toBe(401)
+})
+it('authenticates an admin-created custom account and invalidates its session on credential changes',async()=>{
+ await mutateEvent(s=>applyEventAction(s,actionSchema.parse({action:'addCourt',username:'Spare_Court',password:'Custom#123',requestId:randomUUID(),version:s.version}),{admin:true}))
+ const first=await login('SPARE_COURT','Custom#123');expect(first.status).toBe(200);expect(await first.json()).toEqual({court:3})
+ const auth=verifyScorerToken(first.cookies.get('sk_scorer')!.value)!
+ await mutateEvent(s=>applyEventAction(s,actionSchema.parse({action:'scorerAccount',court:3,username:'extra-court',password:'Changed#123',requestId:randomUUID(),version:s.version}),{admin:true}))
+ const state=await readEvent();expect(state.courtSessions['3']).toBeUndefined()
+ expect(()=>applyEventAction(state,actionSchema.parse({action:'start',coinTossWinner:'A',match:1,version:0,requestId:randomUUID()}),{admin:false,...auth})).toThrow('session ended')
+ expect((await login('spare_court','Custom#123')).status).toBe(401)
+ expect((await login('extra-court','Changed#123')).status).toBe(200)
+})

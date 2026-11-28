@@ -1,3 +1,4 @@
+import { MAX_COURTS } from './event-types'
 import { cookies } from 'next/headers'
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 export const ADMIN_COOKIE = 'sk_admin'
@@ -20,7 +21,7 @@ export function verifyToken(token: string) {
 export async function isAdminAuthed() { return verifyToken((await cookies()).get(ADMIN_COOKIE)?.value ?? '') }
 export function verifyScorerPassword(court: number, input: string) {
   const configured = process.env[`COURT${court}_PASSWORD`]
-  return [1,2,3].includes(court) && Boolean(configured) && secret().length >= 32 && equal(input, configured!)
+  return Number.isInteger(court) && court >= 1 && court <= MAX_COURTS && Boolean(configured) && secret().length >= 32 && equal(input, configured!)
 }
 export function scorerToken(court: number, session: string) {
   const payload = `${court}.${Date.now()+12*60*60*1000}.${session}`
@@ -29,7 +30,7 @@ export function scorerToken(court: number, session: string) {
 export function verifyScorerToken(token: string): {court: number; session: string} | null {
   if (secret().length < 32) return null
   const [court,expiry,session,signature,extra]=token.split('.')
-  if(extra||!session||!signature||![1,2,3].includes(Number(court))||!Number.isFinite(Number(expiry))||Number(expiry)<=Date.now())return null
+  if(extra||!session||!signature||(!Number.isInteger(Number(court))||Number(court)<1||Number(court)>MAX_COURTS)||!Number.isFinite(Number(expiry))||Number(expiry)<=Date.now())return null
   return equal(signature,createHmac('sha256',secret()).update(`${court}.${expiry}.${session}`).digest('hex'))?{court:Number(court),session}:null
 }
 export async function getScorerAuth() { return verifyScorerToken((await cookies()).get(SCORER_COOKIE)?.value??'') }

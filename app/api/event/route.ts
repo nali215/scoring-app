@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { isSameOrigin } from '@/lib/request-origin'
 import { isAdminAuthed, getScorerAuth } from '@/lib/auth'
 import { readEvent, mutateEvent } from '@/lib/event-store'
+import { eventCourts } from '@/lib/event-types'
 import { actionSchema, applyEventAction, EventError, publicView, type Actor } from '@/lib/event-engine'
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -10,7 +11,7 @@ export async function GET(request: Request) {
   try {
     const admin = await isAdminAuthed(), state = await readEvent(true)
     const court = new URL(request.url).searchParams.get('court') ?? '', scorer=await getScorerAuth()
-    const courtAccess = Boolean(scorer && String(scorer.court)===court && state.scorerEnabled[court] && state.courtSessions[court]===scorer.session)
+    const courtAccess = Boolean(scorer && eventCourts(state).includes(scorer.court) && String(scorer.court)===court && state.scorerEnabled[court] && state.courtSessions[court]===scorer.session)
     if (court && !courtAccess && !admin) return response({ error: 'Scoring session ended or this court is not assigned to you. Sign in again.' }, 403)
     if (!state.published && !admin && !courtAccess) return response({ unpublished: true })
     return response(publicView(state, admin))
