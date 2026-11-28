@@ -1,14 +1,16 @@
 import { doublesService, type ServiceStart, type Side } from './doubles-service'
-import type { EventState, Match } from './event-types'
+import type { EventState, Match, ScoreBaseline } from './event-types'
 import type { GameSnapshot, ScoringRules } from './scoring/types'
 import { finalizeIfWon } from './scoring/validation'
 // Track physical right/left positions separately from the server's first/second turn.
-export function pickleballService(start:ServiceStart,rallies:Side[],sideOutScoring=true){
+export function pickleballService(start:ServiceStart,rallies:Side[],sideOutScoring=true,baseline?:ScoreBaseline){
+ if(baseline)start=baseline
  const other=(s:Side):Side=>s==='A'?'B':'A'
  const positions:Record<Side,[number,number]>={A:[0,1],B:[0,1]}
  positions[start.serving]=[start.server,1-start.server];positions[other(start.serving)]=[start.receiver,1-start.receiver]
- let serving=start.serving,server:number=start.server,serverNumber:1|2=sideOutScoring?2:1,first=sideOutScoring
- const score={A:0,B:0}
+ if(baseline?.court==='left'){positions[start.serving].reverse();positions[other(start.serving)].reverse()}
+ let serving=start.serving,server:number=start.server,serverNumber:1|2=baseline?.serverNumber??(sideOutScoring?2:1),first=baseline?.firstServerExceptionActive??sideOutScoring
+ const score={A:baseline?.teamAScore??0,B:baseline?.teamBScore??0}
  for(const winner of rallies){
   if(!sideOutScoring){score[winner]++;positions[winner]=[positions[winner][1],positions[winner][0]];if(winner!==serving){serving=winner;server=positions[serving][0]}serverNumber=1;first=false;continue}
   if(winner===serving){score[winner]++;positions[serving]=[positions[serving][1],positions[serving][0]]}
@@ -18,9 +20,9 @@ export function pickleballService(start:ServiceStart,rallies:Side[],sideOutScori
  const idx=positions[serving].indexOf(server)
  return {serving,receiving:other(serving),server,receiver:positions[other(serving)][idx],court:idx===0?'right':'left',score,serverNumber,firstServerExceptionActive:first}
 }
-export function serviceFor(state:Pick<EventState,'settings'>,match:Match,index=match.games.length-1){return state.settings.sport==='pickleball'?pickleballService(match.starts[index],match.rallies[index],(match.sideOutScoring??state.settings.sideOutScoring)!==false):{...doublesService(match.starts[index],match.rallies[index]),serverNumber:null}}
-export function pickleballSnapshot(start:ServiceStart,rallies:Side[],rules:ScoringRules):GameSnapshot{
- const s=pickleballService(start,rallies,rules.sideOutScoring)
+export function serviceFor(state:Pick<EventState,'settings'>,match:Match,index=match.games.length-1){return state.settings.sport==='pickleball'?pickleballService(match.starts[index],match.rallies[index],(match.sideOutScoring??state.settings.sideOutScoring)!==false,match.manualBaselines?.[index]):{...doublesService(match.starts[index],match.rallies[index]),serverNumber:null,firstServerExceptionActive:false}}
+export function pickleballSnapshot(start:ServiceStart,rallies:Side[],rules:ScoringRules,baseline?:ScoreBaseline):GameSnapshot{
+ const s=pickleballService(start,rallies,rules.sideOutScoring,baseline)
  return finalizeIfWon({teamAScore:s.score.A,teamBScore:s.score.B,servingSide:s.serving,serverNumber:s.serverNumber,firstServerExceptionActive:s.firstServerExceptionActive,serviceSide:s.court as 'left'|'right',status:'in_progress',winnerSide:null},rules)
 }
 

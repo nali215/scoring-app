@@ -1,9 +1,9 @@
 import { hashScorerPassword } from './scorer-credentials'
 import { z } from 'zod'
 import { awardBadmintonRally, createBadmintonGame } from './scoring/badminton'
-import { matchWinner } from './scoring/validation'
-import type { ScoringRules } from './scoring/types'
-import { type EventState, type Match, type Division, playerName, eventCourts, MAX_COURTS } from './event-types'
+import { gameWinner, finalizeIfWon, matchWinner } from './scoring/validation'
+import type { GameSnapshot, ScoringRules } from './scoring/types'
+import { type EventState, type Match, type Division, playerName, type ScoreBaseline, eventCourts, MAX_COURTS } from './event-types'
 import { serviceFor, pickleballSnapshot, nextServingTeam } from './event-service'
 
 const division = z.enum(['men', 'mixed', 'legends','adult','junior'])
@@ -12,16 +12,18 @@ const common = { requestId: z.string().uuid(), version: z.number().int().nonnega
 const matchFields = { ...common, match: z.number().int().min(1).max(999) }
 const username = z.string().trim().toLowerCase().min(3).max(40).regex(/^[a-z0-9][a-z0-9_.-]*$/, 'Use letters, numbers, dots, underscores or hyphens for the username.')
 const password = z.string().min(6).max(128)
+const manualService = z.object({serving:z.enum(['A','B']),server:z.union([z.literal(0),z.literal(1)]),receiver:z.union([z.literal(0),z.literal(1)]),court:z.enum(['left','right']),serverNumber:z.union([z.literal(1),z.literal(2)]),openingServe:z.boolean()})
 const firstPlayers = { server: z.union([z.literal(0),z.literal(1)]).default(0), receiver: z.union([z.literal(0),z.literal(1)]).default(0) }
 export const actionSchema = z.discriminatedUnion('action', [
   z.object({ ...matchFields, ...firstPlayers, action: z.literal('start'), coinTossWinner: z.enum(['A', 'B']), court: z.number().int().min(1).max(MAX_COURTS).optional(), serving: z.enum(['A', 'B']).default('A') }),
   z.object({ ...matchFields, action: z.literal('point'), side: z.enum(['A', 'B']) }),
   z.object({ ...matchFields, action: z.literal('removePoint'), side: z.enum(['A', 'B']) }),
-  z.object({ ...matchFields, ...firstPlayers, action: z.literal('nextGame') }),
+  z.object({ ...matchFields, ...firstPlayers, action: z.literal('nextGame'), serving:z.enum(['A','B']).optional() }),
   z.object({ ...matchFields, action: z.literal('submit') }),
   z.object({ ...matchFields, action: z.literal('cancelMatch') }),
   z.object({ ...common, action: z.literal('resetDemo'), confirmation: z.literal('RESET DEMO') }),
   z.object({ ...matchFields, action: z.literal('reopen'), reason: z.string().trim().min(5).max(300) }),
+  z.object({ ...matchFields, action: z.literal('manualScore'), mode:z.enum(['final','live']), games:z.array(z.object({a:z.number().int().min(0).max(999),b:z.number().int().min(0).max(999)})).min(1).max(3),service:manualService.optional(),preserveSeeds:z.boolean().default(false),reason:z.string().trim().min(5).max(300) }),
   z.object({ ...matchFields, action: z.literal('schedule'), date: z.string().date().optional(), court: z.number().int().min(1).max(MAX_COURTS), time }),
   z.object({ ...common, action: z.literal('settings'), settings: z.object({ sideOutScoring: z.boolean().optional(), name: z.string().trim().min(3).max(100), date: z.string().date(), venue: z.string().trim().max(200), note: z.string().trim().max(1000), winBy: z.number().int().min(1).max(2), cap: z.number().int().min(0).max(50), reviewed: z.boolean() }) }),
   z.object({ ...common, action: z.literal('publish'), published: z.boolean() }),
@@ -91,7 +93,55 @@ export function applyEventAction(state: EventState, action: EventAction, actor: 
     const oldGameIndex=match.games.length-1
     const beforeService=oldGameIndex>=0?serviceFor(state,match,oldGameIndex):null
     if (scoreActions.includes(action.action)) requireThat(state.published, 'Publish the tournament before scoring.')
-    if (action.action === 'schedule') {
+    if (action.action === 'manualScore') {
+      requireThat(match.a.team && match.b.team, 'Assign both teams by confirming seeds or completing preceding matches first.')
+      requireThat(action.mode==='final'||state.settings.sport==='pickleball', 'Current-score entry is available for pickleball.')
+      const candidate={...match,sideOutScoring:match.sideOutScoring??state.settings.sideOutScoring!==false}
+      const rules=rulesFor(state,candidate), winners:('A'|'B')[]=[], games:GameSnapshot[]=[], baselines:Record<string,ScoreBaseline>={}
+      requireThat(action.games.length<=rules.bestOf, `This match has at most ${rules.bestOf} games.`)
+      if(match.round==='Round robin' && state.seeds[match.division]) requireThat(action.preserveSeeds, 'Playoff seeds are confirmed. Explicitly keep those seeds to update this result.')
+      for(const [i,score] of action.games.entries()) {
+        requireThat(!matchWinner(winners,rules), 'Remove extra games after the match was already won.')
+        requireThat(!rules.pointCap || (score.a<=rules.pointCap&&score.b<=rules.pointCap), `Game ${i+1}: the cap is ${rules.pointCap}.`)
+        const current=action.mode==='live'&&i===action.games.length-1
+        const service=current?action.service:undefined
+        if(current) requireThat(service, 'Choose the current serving team, server, receiver and service court.')
+        const snapshot:GameSnapshot={teamAScore:score.a,teamBScore:score.b,servingSide:service?.serving??'A',serverNumber:service?(rules.sideOutScoring?service.serverNumber:1):null,firstServerExceptionActive:service?rules.sideOutScoring&&service.openingServe:false,serviceSide:service?.court??null,status:'in_progress',winnerSide:null}
+        const winner=gameWinner(snapshot,rules)
+        if(current) {
+          requireThat(!winner, `Game ${i+1} is already complete. Record it as completed and add the current game, or save a final result.`)
+          requireThat(!service!.openingServe||!rules.sideOutScoring||(service!.serverNumber===2&&(service!.serving==='A'?score.b:score.a)===0), 'An opening service turn uses server 2 and the receiving team must have zero points.')
+          baselines[String(i)]={serving:service!.serving,server:service!.server,receiver:service!.receiver,court:service!.court,serverNumber:rules.sideOutScoring?service!.serverNumber:1,firstServerExceptionActive:rules.sideOutScoring&&service!.openingServe,teamAScore:score.a,teamBScore:score.b}
+          games.push(snapshot)
+        } else {
+          requireThat(winner, `Game ${i+1} needs a valid winning score: to ${rules.pointsToWin}, win by ${rules.winBy}${rules.pointCap?`, cap ${rules.pointCap}`:''}.`)
+          const previous={...snapshot,...(winner==='A'?{teamAScore:score.a-1}:{teamBScore:score.b-1})}
+          requireThat(!gameWinner(previous,rules), `Game ${i+1} has points after the game should have ended. Check the winning score.`)
+          winners.push(winner);games.push(finalizeIfWon(snapshot,rules))
+        }
+      }
+      const side=matchWinner(winners,rules),nextWinner=action.mode==='final'?(side==='A'?match.a.team:match.b.team):undefined
+      if(action.mode==='final') requireThat(side, `Enter all games needed to win this best-of-${rules.bestOf} match.`)
+      const downstreamStarted=descendants(state,match.number).some(m=>m.status!=='Scheduled')
+      requireThat(!downstreamStarted||(action.mode==='final'&&nextWinner===match.winner), 'A dependent playoff match has started. You can correct scores while retaining the same winner; a winner change needs downstream correction first.')
+      if(action.mode==='live') {
+        requireThat(eventCourts(state).includes(match.court), 'Assign this match to a configured court before resuming it.')
+        const busy=state.matches.filter(m=>m.number!==match.number&&(m.status==='Live'||m.status==='Awaiting confirmation'))
+        requireThat(!busy.some(m=>m.court===match.court), 'This court already has another active match. Reassign the match before resuming it.')
+        const players=playerIds(state,match)
+        requireThat(!busy.some(m=>playerIds(state,m).some(p=>players.includes(p))), 'A player is already playing another active match.')
+      }
+      const at=new Date().toISOString(),oldScore=match.games.map(g=>`${g.teamAScore}–${g.teamBScore}`).join(' / ')||'No score'
+      match.scoreArchives??=[]
+      match.scoreArchives.push({at,reason:action.reason,games:structuredClone(match.games),rallies:structuredClone(match.rallies),starts:structuredClone(match.starts),...(match.manualBaselines?{manualBaselines:structuredClone(match.manualBaselines)}:{}),status:match.status,...(match.winner?{winner:match.winner}:{})})
+      match.games=games;match.rallies=games.map(()=>[]);match.starts=games.map((_,i)=>{const b=baselines[String(i)];return b?{serving:b.serving,server:b.server,receiver:b.receiver}:{serving:'A',server:0,receiver:0}})
+      match.manualBaselines=baselines;match.sideOutScoring=candidate.sideOutScoring;match.history=[]
+      match.status=action.mode==='final'?'Final':'Live';if(nextWinner)match.winner=nextWinner;else delete match.winner
+      match.scoreEntry={at,reason:action.reason,mode:action.mode}
+      const last=games.length-1,baseline=baselines[String(last)],newScore=games.map(g=>`${g.teamAScore}–${g.teamBScore}`).join(' / ')
+      match.log.push({at,action:'manualScore',game:last+1,reason:action.reason,score:newScore,server:baseline?playerName(state,match,baseline.serving,baseline.server):'Not recorded',receiver:baseline?playerName(state,match,baseline.serving==='A'?'B':'A',baseline.receiver):'Not recorded',nextServer:baseline?playerName(state,match,baseline.serving,baseline.server):'Not recorded',serviceCourt:baseline?.court??'not recorded'})
+      detail=`Admin ${action.mode==='final'?'final result':'current-score checkpoint'}: ${oldScore} → ${newScore}. ${action.reason}${action.preserveSeeds?' Confirmed playoff seeds retained.':''}`
+    } else if (action.action === 'schedule') {
       requireThat(match.status === 'Scheduled', 'Only unstarted matches can be rescheduled.')
       detail = `${match.time}, Court ${match.court} → ${action.time}, Court ${action.court}`
       requireThat(eventCourts(state).includes(action.court), 'Add this court in Scorers before assigning matches.')
@@ -101,7 +151,7 @@ export function applyEventAction(state: EventState, action: EventAction, actor: 
     } else if (action.action === 'cancelMatch') {
       requireThat(match.status === 'Live' || match.status === 'Awaiting confirmation', 'Only an unconfirmed match can be cancelled.')
       match.games = []; match.rallies = []; match.starts = []; match.log = []; match.history = [];
-      match.status = 'Scheduled'; delete match.winner; delete match.coinToss
+      match.status = 'Scheduled'; delete match.winner; delete match.coinToss; delete match.manualBaselines; delete match.scoreEntry
       detail = 'Cancelled accidental start and cleared unconfirmed scoring; match returned to schedule.'
     } else if (action.action === 'reopen') {
       requireThat(match.status === 'Final', 'Only final matches can be reopened.')
@@ -121,6 +171,7 @@ export function applyEventAction(state: EventState, action: EventAction, actor: 
       const players = playerIds(state, match)
       requireThat(!busy.some(m => playerIds(state, m).some(p => players.includes(p))), 'A player is still playing on another court.')
       if (state.settings.sport!=='pickleball' && match.round === 'Final') requireThat(!state.matches.some(m => m.round === 'Final' && m.number < match.number && m.status !== 'Final'), 'Complete the earlier final first. Finals are consecutive.')
+      delete match.manualBaselines; delete match.scoreEntry
       match.court = targetCourt
       match.coinToss = { winner: action.coinTossWinner, at: new Date().toISOString() };
       detail = `Started on Court ${targetCourt}${previousCourt !== targetCourt ? ` (moved from Court ${previousCourt})` : ''}. Coin toss won by ${state.teams.find(t => t.id === (action.coinTossWinner === 'A' ? match.a.team : match.b.team))!.name}. First serving team: ${action.serving}.`;
@@ -132,7 +183,7 @@ export function applyEventAction(state: EventState, action: EventAction, actor: 
       match.history.push({ games: structuredClone(match.games), status: match.status }); match.history=match.history.slice(-5)
       const i = match.games.length - 1
       match.rallies[i].push(action.side)
-      match.games[i] = state.settings.sport==='pickleball'?pickleballSnapshot(match.starts[i],match.rallies[i],rulesFor(state,match)):awardBadmintonRally(match.games[i], action.side, rulesFor(state, match)).next
+      match.games[i] = state.settings.sport==='pickleball'?pickleballSnapshot(match.starts[i],match.rallies[i],rulesFor(state,match),match.manualBaselines?.[i]):awardBadmintonRally(match.games[i], action.side, rulesFor(state, match)).next
       if (winnerSide(state, match)) match.status = 'Awaiting confirmation'
       detail = `Point ${action.side}`
     } else if (action.action === 'removePoint') {
@@ -144,17 +195,18 @@ export function applyEventAction(state: EventState, action: EventAction, actor: 
       rallies.splice(index, 1)
       // Replay the remaining rallies to keep service and winner state consistent.
       const first = match.starts[i].serving
-      let game = state.settings.sport==='pickleball'?pickleballSnapshot(match.starts[i],[],rulesFor(state,match)):createBadmintonGame(first)
+      let game = state.settings.sport==='pickleball'?pickleballSnapshot(match.starts[i],[],rulesFor(state,match),match.manualBaselines?.[i]):createBadmintonGame(first)
       for (const [rallyIndex,side] of rallies.entries()) {
         requireThat(game.status !== 'completed', 'This correction would put rallies after a completed game. Remove the most recent winning point first.')
-        game = state.settings.sport==='pickleball'?pickleballSnapshot(match.starts[i],rallies.slice(0,rallyIndex+1),rulesFor(state,match)):awardBadmintonRally(game, side, rulesFor(state, match)).next
+        game = state.settings.sport==='pickleball'?pickleballSnapshot(match.starts[i],rallies.slice(0,rallyIndex+1),rulesFor(state,match),match.manualBaselines?.[i]):awardBadmintonRally(game, side, rulesFor(state, match)).next
       }
       match.games[i] = game
       match.status = winnerSide(state, match) ? 'Awaiting confirmation' : 'Live'
       detail = `Removed latest point for ${action.side} in game ${i+1}`
     } else if (action.action === 'nextGame') {
       requireThat(match.status === 'Live' && match.games.at(-1)?.winnerSide && !winnerSide(state, match), 'Complete the current game first.')
-      const serving=nextServingTeam(state,match)
+      if(match.scoreEntry)requireThat(action.serving, 'Choose the first serving team for the next game; the opening service history was not fully recorded.')
+      const serving=match.scoreEntry?action.serving!:nextServingTeam(state,match)
       match.games.push(state.settings.sport==='pickleball'?pickleballSnapshot({serving,server:action.server,receiver:action.receiver},[],rulesFor(state,match)):createBadmintonGame(serving)); match.rallies.push([]);match.starts.push({serving,server:action.server,receiver:action.receiver})
     } else if (action.action === 'submit') {
       requireThat(match.status === 'Awaiting confirmation', 'Finish the required games before confirming the result.')
@@ -175,7 +227,7 @@ export function applyEventAction(state: EventState, action: EventAction, actor: 
     if (action.action === 'resetDemo') {
       for (const m of state.matches) {
         m.games = []; m.rallies = []; m.starts = []; m.log = []; m.history = [];
-        m.status = 'Scheduled'; delete m.winner; delete m.coinToss; m.version++;
+        m.status = 'Scheduled'; delete m.winner; delete m.coinToss; delete m.manualBaselines; delete m.scoreEntry; delete m.scoreArchives; m.version++;
       }
       state.seeds = {}; state.coinTosses = [];
       for (const team of state.teams) team.checkedIn = false
@@ -260,6 +312,6 @@ export function applyEventAction(state: EventState, action: EventAction, actor: 
 
 export function publicView(state: EventState, admin = false) {
   const { courtSessions, requests: _requests, audit, scorerAccounts: _accounts, ...view } = state
-  const slim = { ...view, matches: view.matches.map(m => ({ ...m, history: [], log: [] })) }
+  const slim = { ...view, matches: view.matches.map(m => ({ ...m, scoreArchives:[], history: [], log: [] })) }
   return admin ? { ...slim, scorerUsernames: Object.fromEntries(eventCourts(state).map(n => [String(n), state.scorerAccounts?.[String(n)]?.username ?? `court${n}`])), activeCourts: Object.keys(courtSessions).map(Number), audit: audit.slice(-100) } : slim
 }

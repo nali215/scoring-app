@@ -16,7 +16,7 @@ async function readLocal(): Promise<EventState | null> {
 export async function readEvent(light = false): Promise<EventState> {
   if (process.env.DATABASE_URL) {
     const rows = light
-      ? await prisma.$queryRaw<{data:EventState}[]>`SELECT (data - 'requests' - 'audit') || jsonb_build_object('requests','[]'::jsonb,'audit',COALESCE((SELECT jsonb_agg(v ORDER BY n) FROM (SELECT v,n FROM jsonb_array_elements(data->'audit') WITH ORDINALITY AS a(v,n) ORDER BY n DESC LIMIT 100) AS recent),'[]'::jsonb),'matches',(SELECT jsonb_agg((m - 'history' - 'log') || '{"history":[],"log":[]}'::jsonb ORDER BY n) FROM jsonb_array_elements(data->'matches') WITH ORDINALITY AS a(m,n))) AS data FROM "EventDocument" WHERE id = ${documentId}`
+      ? await prisma.$queryRaw<{data:EventState}[]>`SELECT (data - 'requests' - 'audit') || jsonb_build_object('requests','[]'::jsonb,'audit',COALESCE((SELECT jsonb_agg(v ORDER BY n) FROM (SELECT v,n FROM jsonb_array_elements(data->'audit') WITH ORDINALITY AS a(v,n) ORDER BY n DESC LIMIT 100) AS recent),'[]'::jsonb),'matches',(SELECT jsonb_agg((m - 'history' - 'log' - 'scoreArchives') || '{"history":[],"log":[]}'::jsonb ORDER BY n) FROM jsonb_array_elements(data->'matches') WITH ORDINALITY AS a(m,n))) AS data FROM "EventDocument" WHERE id = ${documentId}`
       : await prisma.$queryRaw<{ data: EventState }[]>`SELECT data FROM "EventDocument" WHERE id = ${documentId}`
     return rows[0]?.data ?? createEvent()
   }
@@ -49,6 +49,6 @@ export async function mutateEvent(update: (state: EventState) => EventState): Pr
 
 export async function readMatchEvent(number:number):Promise<EventState>{
  if(!process.env.DATABASE_URL)return readEvent();
- const rows=await prisma.$queryRaw<{data:EventState}[]>`SELECT (data - 'matches' - 'audit' - 'requests') || jsonb_build_object('audit','[]'::jsonb,'requests','[]'::jsonb,'matches',COALESCE((SELECT jsonb_agg(m - 'history') FROM jsonb_array_elements(data->'matches') AS a(m) WHERE (m->>'number')::int = ${number}),'[]'::jsonb)) AS data FROM "EventDocument" WHERE id=${documentId}`;
+ const rows=await prisma.$queryRaw<{data:EventState}[]>`SELECT (data - 'matches' - 'audit' - 'requests') || jsonb_build_object('audit','[]'::jsonb,'requests','[]'::jsonb,'matches',COALESCE((SELECT jsonb_agg(m - 'history' - 'scoreArchives') FROM jsonb_array_elements(data->'matches') AS a(m) WHERE (m->>'number')::int = ${number}),'[]'::jsonb)) AS data FROM "EventDocument" WHERE id=${documentId}`;
  return rows[0]?.data??createEvent();
 }

@@ -7,14 +7,18 @@ export const divisionNames: Record<Division, string> = { men: "Men's Doubles", m
 export const divisions: Division[] = ['men', 'mixed', 'legends']
 export type Team = { id: string; division: Division; name: string; players: string[]; checkedIn: boolean; displayPlayers?: string[]; pool?: 'A'|'B' }
 export type Slot = { team?: string; seed?: number; winner?: number }
+export type ScoreBaseline = ServiceStart & { teamAScore:number; teamBScore:number; court:'left'|'right'; serverNumber:1|2; firstServerExceptionActive:boolean }
 export type Match = {
   number: number; division: Division; round: 'Round robin' | 'Round of 16' | 'Quarterfinal' | 'Semifinal' | 'Final'; court: number; time: string; date?: string; sideOutScoring?: boolean; format?: { pointsToWin: number; bestOf: 1 | 3; cap?: number; winBy?: number }; pool?: 'A'|'B'; poolRound?: number;
   a: Slot; b: Slot; games: GameSnapshot[]; status: 'Scheduled' | 'Live' | 'Awaiting confirmation' | 'Final';
   coinToss?: { winner: 'A' | 'B'; at: string };
+  scoreEntry?: {at:string;reason:string;mode:'final'|'live'};
+  manualBaselines?: Record<string,ScoreBaseline>;
+  scoreArchives?: {at:string;reason:string;games:GameSnapshot[];rallies:('A'|'B')[][];starts:ServiceStart[];manualBaselines?:Record<string,ScoreBaseline>;status:Match['status'];winner?:string}[];
   winner?: string; version: number; history: { games: GameSnapshot[]; status: Match['status'] }[];
   rallies: ('A' | 'B')[][];
   starts: ServiceStart[];
-  log: { at: string; action: 'point' | 'removePoint' | 'startGame' | 'removeRally'; game: number; side?: 'A'|'B'; server: string; receiver: string; score: string; nextServer: string; serviceCourt: string }[];
+  log: { at: string; action: 'point' | 'removePoint' | 'startGame' | 'removeRally' | 'manualScore'; reason?:string; game: number; side?: 'A'|'B'; server: string; receiver: string; score: string; nextServer: string; serviceCourt: string }[];
 }
 export type EventState = {
   schema: 1; version: number; updatedAt: string; published: boolean;
