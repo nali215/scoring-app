@@ -40,7 +40,7 @@ export class EventError extends Error { constructor(message: string, public stat
 function requireThat(condition: unknown, message: string, status = 400): asserts condition { if (!condition) throw new EventError(message, status) }
 
 export function rulesFor(state: EventState, match: Match): ScoringRules {
-  return { sport: state.settings.sport??'badminton', pointsToWin: match.format?.pointsToWin??21, winBy: state.settings.winBy, pointCap: state.settings.cap||undefined, bestOf: match.format?.bestOf??(match.round === 'Round robin' ? 1 : 3), doubles: true, sideOutScoring: state.settings.sport==='pickleball'&&(match.sideOutScoring??state.settings.sideOutScoring)!==false, showServerNumber: state.settings.sport==='pickleball' }
+  return { sport: state.settings.sport??'badminton', pointsToWin: match.format?.pointsToWin??21, winBy: match.format?.winBy??state.settings.winBy, pointCap: (match.format?.cap??state.settings.cap)||undefined, bestOf: match.format?.bestOf??(match.round === 'Round robin' ? 1 : 3), doubles: true, sideOutScoring: state.settings.sport==='pickleball'&&(match.sideOutScoring??state.settings.sideOutScoring)!==false, showServerNumber: state.settings.sport==='pickleball' }
 }
 function winnerSide(state: EventState, match: Match) {
   return matchWinner(match.games.flatMap(g => g.winnerSide ? [g.winnerSide] : []), rulesFor(state, match))
@@ -212,7 +212,7 @@ export function applyEventAction(state: EventState, action: EventAction, actor: 
       const name = (id: string) => state.teams.find(t => t.id === id)!.name
       state.coinTosses ??= []
       state.coinTosses.push({ id: action.requestId, division: action.division, teams: action.teams, winner: action.winner, note: action.note, at: new Date().toISOString(), actor: 'Admin' })
-      detail = `Coin toss: ${action.teams.map(name).join(' vs ')}. Winner: ${name(action.winner)}.${action.note ? ` ${action.note}` : ''}`
+      detail = `${action.division==='mixed'&&state.settings.mixedDoubles?'Physical draw / coin toss':'Coin toss'}: ${action.teams.map(name).join(' vs ')}. Winner: ${name(action.winner)}.${action.note ? ` ${action.note}` : ''}`
     } else if (action.action === 'seed') {
       unstartedKnockouts(state, action.division)
       requireThat(state.matches.filter(m => m.division === action.division && m.round === 'Round robin').every(m => m.status === 'Final') || ('overrideReason' in action && Boolean(action.overrideReason)), 'Complete all round-robin matches or provide an admin playoff override reason.')
